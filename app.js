@@ -73,7 +73,7 @@ const TOOLS=['r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py'
 const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
 let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
 function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
-async function startWorker(){newReady();$('pystat').textContent='Loading Python…';$('pystat').classList.remove('ok');setRunBtns();
+async function startWorker(){newReady();if(typeof syncSites==="function")await syncSites().catch(()=>{});$('pystat').textContent='Loading Python…';$('pystat').classList.remove('ok');setRunBtns();
  if(!setupTxt){setupTxt=await (await fetch('kp_setup.py')).text();wsetupTxt=await (await fetch('kp_worker.py')).text()}
  if(self.crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined'){SAB=new SharedArrayBuffer(12+65536);INTR=new Uint8Array(SAB,0,1);CTL=new Int32Array(SAB,4,2);DAT=new Uint8Array(SAB,12)}
  W=new Worker('worker.js');W.onmessage=onW;W.onerror=e=>log('Worker error: '+(e.message||e),'err');
@@ -90,6 +90,8 @@ function onW(e){const m=e.data;
  if(m.t==='out'&&dropOut)return;if(m.t==='out'&&!m.c){bufOut(m.s);return}flushOut();
  if(m.t==='out')log(m.s,m.c);else if(m.t==='img')kpShowImg(m.b);else if(m.t==='turtle')kpT(...m.a);
  else if(m.t==='input')askInput(m);
+ else if(m.t==='blocked'){log(`Blocked: ${m.o} isn't in Allowed sites. Add it in Tools > Allowed sites.`,'err')}
+ else if(m.t==='sites'||m.kpSites||m.kpGetSites){console.warn('Rejected: Python tried to change Allowed sites');log('⛔ Rejected: scripts cannot change Allowed sites.','err')}
  else if(m.t==='pkgs'){const l=Array.isArray(m.l)?m.l.filter(s=>typeof s==='string'&&/^[\w.\-\[\]=<>]{1,120}$/.test(s)):[];S('kp_pkgs',l)}
  else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');
   $('c-unit').innerHTML=m.units.map(k=>`<option>${esc(k)}</option>`).join('');readyRes();setRunBtns();log('Python '+m.v+' ready'+(m.sab?'':' (compat mode: Stop restarts Python)'),'sys')}
@@ -122,7 +124,7 @@ $('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
 async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
 function toast2(t){let d=$('toast');if(!d){d=document.createElement('div');d.id='toast';document.body.appendChild(d)}d.textContent=t;d.classList.add('on');clearTimeout(d._t);d._t=setTimeout(()=>d.classList.remove('on'),2200)}
-startWorker();
+setTimeout(startWorker,0); // after app4.js (syncSites) has loaded
 
 /* packages */
 async function installPkg(name){name=name.trim();if(!name)return;showView('v-code');log('Installing '+name+'…','sys');
@@ -196,7 +198,7 @@ function renderSnips(){const f=$('sn-filter').value;$('snip-list').innerHTML=SNI
 $('sn-filter').onchange=renderSnips;
 
 /* backup */
-const DATA_KEYS=['kp_hours','kp_budget','kp_miles','kp_rate','kp_mrate','kp_turtle','kp_hi','kp_pkgs'];
+const DATA_KEYS=['kp_sites','kp_hours','kp_budget','kp_miles','kp_rate','kp_mrate','kp_turtle','kp_hi','kp_pkgs'];
 function exportData(){if(cur)scripts[cur]=cm.getValue();persist();const d={app:'KPython',version:2,exported:new Date().toISOString(),scripts,cur,data:{}};DATA_KEYS.forEach(k=>{const v=LS.getItem(k);if(v!==null)d.data[k]=v});return d}
 $('bk-exp').onclick=async()=>{const bd=exportData();try{const h=await pycall('_kp_hist_dump');if(typeof h==='string'&&h.startsWith('{'))bd.history=JSON.parse(h)}catch(e){}const txt=JSON.stringify(bd,null,1),name=`kpython-backup-${today()}.json`;const file=new File([txt],name,{type:'application/json'});
  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});$('bk-msg').textContent='Shared '+name;return}catch(e){if(e.name==='AbortError')return}}
@@ -204,12 +206,13 @@ $('bk-exp').onclick=async()=>{const bd=exportData();try{const h=await pycall('_k
 const VALID={kp_hours:x=>Array.isArray(x)&&x.every(s=>s&&/^\d{4}-\d\d-\d\d$/.test(s.date)&&/^\d\d:\d\d$/.test(s.start)&&/^\d\d:\d\d$/.test(s.end)&&isFinite(s.rate)&&isFinite(s.id)),
  kp_budget:x=>Array.isArray(x)&&x.every(e=>e&&/^\d{4}-\d\d-\d\d$/.test(e.date)&&['in','out'].includes(e.type)&&isFinite(e.amt)&&isFinite(e.id)&&typeof e.desc==='string'),
  kp_miles:x=>Array.isArray(x)&&x.every(m=>m&&/^\d{4}-\d\d-\d\d$/.test(m.date)&&isFinite(m.mi)&&isFinite(m.id)&&typeof m.why==='string'),
+ kp_sites:x=>Array.isArray(x)&&kpCleanSites(x).length===x.length,
  kp_pkgs:x=>Array.isArray(x)&&x.every(p=>typeof p==='string'&&/^[\w.\-\[\]=<>]+$/.test(p))};
 function validKey(k,v){if(typeof v!=='string')return false;if(!VALID[k])return true;try{return VALID[k](JSON.parse(v))}catch(e){return false}}
 function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||Array.isArray(d.scripts)||!Object.values(d.scripts).every(v=>typeof v==='string'))throw new Error('Not a valid KPython backup');
  scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;const bad=[];Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
-$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
+$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.data&&'kp_sites'in d.data&&typeof applySites==='function')applySites('Imported Allowed sites');if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 

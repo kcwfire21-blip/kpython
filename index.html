@@ -58,7 +58,7 @@
 <!-- TOOLS -->
 <section id="v-tools" class="view">
  <div class="chips" id="toolchips">
-  <button data-t="t-quote" class="on">🧽 Quote</button><button data-t="t-hours">⏱ Hours</button><button data-t="t-budget">💵 Budget</button><button data-t="t-miles">🚗 Miles</button><button data-t="t-calc">🧮 Calc</button><button data-t="t-gh">🐙 GitHub</button><button data-t="t-more">🛠 More</button>
+  <button data-t="t-quote" class="on">🧽 Quote</button><button data-t="t-hours">⏱ Hours</button><button data-t="t-budget">💵 Budget</button><button data-t="t-miles">🚗 Miles</button><button data-t="t-calc">🧮 Calc</button><button data-t="t-gh">🐙 GitHub</button><button data-t="t-sites">🌐 Allowed sites</button><button data-t="t-more">🛠 More</button>
  </div>
  <div id="t-quote" class="tool on card">
   <h3>Cleaning Quote &amp; Invoice</h3>
@@ -117,6 +117,15 @@
   <div id="gh-fileacts" class="row" style="display:none;flex-wrap:wrap"><button id="gh-toed">📝 To editor</button><button id="gh-run">▶ Run…</button><button id="gh-fromed">⬅ Load current script</button><button id="gh-push" class="pri">⬆ Push…</button></div>
   <div id="gh-msg" class="hint"></div>
  </div>
+ <div id="t-sites" class="tool card">
+  <h3>🌐 Allowed sites</h3>
+  <p class="hint">Python (your scripts, the HTTP tester, pyfetch) can only reach these sites. Only this screen can change the list; scripts can't.</p>
+  <div class="row"><input id="st-in" placeholder="https://api.example.com" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url"><button id="st-add" class="pri">Add</button></div>
+  <div id="st-msg" class="hint"></div>
+  <h3>Your sites</h3><div id="st-list"></div>
+  <h3>Always allowed (defaults)</h3><div id="st-def" class="hint"></div>
+  <button id="st-reset" class="danger">Reset to defaults…</button>
+ </div>
  <div id="t-more" class="tool card">
   <h3>More tools (from the team)</h3><p class="hint">These open in the Code tab and run there.</p>
   <div class="row"><button data-snip="Dev tools" class="pri">🛠 Dev tools</button><button data-snip="Terminal">⌨️ Terminal</button></div>
@@ -159,6 +168,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js" integrity="sha384-69mJoUoPPF/C7qPs6lLjvXvrt6w225+rmxWqGO3a1glVjITdnnwPQOtG9FRTd2Ni" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js" integrity="sha384-ILkploZWukdp1VMmzMnE+32H0mgy2e+w29evc4grALGOqIRGBgbBGrwkX7a6zK7y" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js" integrity="sha384-qCnKPgNYgVO8RO19jShRRAfU75+KVnN1cQy+8CPX/TTwJsUEJ/EpnwKx2UOyLx8c" crossorigin="anonymous"></script>
+<script src="sites.js"></script>
 <script src="snippets.js"></script>
 <script src="app.js"></script>
 <script src="games.js"></script>

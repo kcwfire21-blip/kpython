@@ -1,6 +1,8 @@
 // KPython v4 Python worker: Pyodide runs here so Stop can interrupt or kill it.
 const PY='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
 importScripts(PY+'pyodide.js');
+// Report requests blocked by the Allowed-sites policy so the page can explain them.
+self.addEventListener('securitypolicyviolation',e=>{if(/connect-src/.test(e.effectiveDirective||e.violatedDirective||'')){let o='';try{o=new URL(e.blockedURI).origin}catch(_){o=String(e.blockedURI||'')}post('blocked',{o})}});
 let py=null,intr=null,ctl=null,dat=null,useSAB=false;
 const post=(t,x={})=>postMessage({t,...x});
 self.kpT=(...a)=>post('turtle',{a});

@@ -154,3 +154,28 @@ async function offStatus(){const el=$('offstat');if(!('serviceWorker'in navigato
 offStatus();
 
 $('go-scan').onclick=e=>{e.preventDefault();showView('v-dev');DEV.secrets()};
+
+/* v6.1: Allowed sites (page UI only). Stored in kp_sites, validated on load, sent to the service worker, which builds the worker CSP. */
+const SITE_DEFAULTS=['this app (self)','https://api.github.com','https://cdn.jsdelivr.net/pyodide/v0.26.4/full/','https://pypi.org','https://files.pythonhosted.org'];
+function getSites(){const raw=J('kp_sites',[]);const c=kpCleanSites(raw);if(JSON.stringify(c)!==JSON.stringify(raw))S('kp_sites',c);return c}
+function swMsg(msg){return new Promise(async(res,rej)=>{const reg=await navigator.serviceWorker?.ready;const sw=navigator.serviceWorker?.controller||reg?.active;if(!sw)return rej(new Error('no service worker'));
+ const ch=new MessageChannel();ch.port1.onmessage=e=>res(e.data);sw.postMessage(msg,[ch.port2]);setTimeout(()=>rej(new Error('timeout')),3000)})}
+async function syncSites(){if(!('serviceWorker'in navigator))return;const l=getSites();const r=await Promise.race([swMsg({kpSites:{list:l}}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),2000))]);return r}
+function renderSites(){const l=getSites();$('st-list').innerHTML=l.map((s,i)=>`<div class="item"><span>${esc(s)}</span><button data-i="${i}">✕</button></div>`).join('')||'<p class="hint">None added.</p>';
+ $('st-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{const s=l[+b.dataset.i];if(!confirm('Remove '+s+'?'))return;S('kp_sites',l.filter(x=>x!==s));applySites('Removed '+s)});
+ $('st-def').innerHTML=SITE_DEFAULTS.map(esc).join('<br>')}
+async function applySites(msg){renderSites();$('st-msg').textContent=msg+'. Restarting Python to apply…';toast2('Restarting Python to apply');
+ try{await syncSites()}catch(e){$('st-msg').textContent=msg+'. (Service worker not ready; reload the app to apply.)';return}
+ if(running){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Restarted to apply Allowed sites.'}));pend={};inputMsg=null}else W.terminate();
+ startWorker();await pyReady;$('st-msg').textContent=msg+'. Applied.'}
+$('st-add').onclick=()=>{const r=kpParseSite($('st-in').value);if(r.error){$('st-msg').textContent='❌ '+r.error;return}
+ const l=getSites();if(l.includes(r.origin)){$('st-msg').textContent='Already in the list.';return}if(l.length>=KP_SITES_MAX){$('st-msg').textContent='List is full (50).';return}
+ let warn='';if(r.kind==='ip')warn='\n\n⚠️ This is a raw IP address. Only allow it if you know exactly what it is.';
+ if(r.kind==='local')warn='\n\n⚠️ This is localhost or a Tailscale (100.x) address: a device on your own network. Scripts will be able to talk to it.';
+ if(r.origin.includes('*.'))warn+='\n\nThe * allows every subdomain of that site.';
+ if(r.kind==='ip'&&prompt(`Raw IP address ${r.origin}. Type IP to confirm it's intended:`)!=='IP'){$('st-msg').textContent='Cancelled.';return}
+ const t=prompt(`Allow Python to connect to\n${r.origin}${warn}\n\nType yes to add:`);if((t||'').trim().toLowerCase()!=='yes'){$('st-msg').textContent='Cancelled.';return}
+ S('kp_sites',[...l,r.origin]);$('st-in').value='';applySites('Added '+r.origin)};
+$('st-in').onkeydown=e=>{if(e.key==='Enter')$('st-add').click()};
+$('st-reset').onclick=()=>{if(prompt('Remove all your sites and keep only the defaults? Type RESET:')!=='RESET')return;S('kp_sites',[]);applySites('Reset to defaults')};
+renderSites();
