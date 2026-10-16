@@ -41,11 +41,19 @@ def gen_tests(src, module):
         out.append("    pass")
     for f in funcs:
         args = [a for a in f.args.args if a.arg not in ("self", "cls")]
+        # KPython: arguments with defaults are left out; unknown types get a TODO + skipTest instead of None
+        args = args[:len(args) - len(f.args.defaults)] if f.args.defaults else args
         hints = [hint(a.annotation) for a in args]
-        call = ", ".join(SAMPLES.get(h, ("None",))[0] for h in hints)
+        unknown = [a.arg for a, h in zip(args, hints) if h not in SAMPLES]
+        call = ", ".join(SAMPLES[h][0] if h in SAMPLES else f"{a.arg}=...  # TODO" for a, h in zip(args, hints)) if not unknown else ", ".join(a.arg for a in args)
         ret = hint(f.returns)
         out.append(f"    def test_{f.name}(self):")
-        out.append(f"        result = {f.name}({call})")
+        if unknown:
+            out.append(f"        self.skipTest('TODO: pick values for {', '.join(unknown)}')")
+            out.append(f"        result = {f.name}({call})  # TODO: replace with real values")
+            hints = []
+        else:
+            out.append(f"        result = {f.name}({call})")
         out.append(f"        self.{RESULT_ASSERT.get(ret, 'assertIsNotNone(result)')}  # TODO: assert exact expected value")
         out.append("")
         edges = []

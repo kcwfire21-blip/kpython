@@ -80,7 +80,7 @@ $('d-q').onkeydown=e=>{if(e.key==='Enter')$('d-go').click()};
 document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.textContent;$('d-go').click()});
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
-async function dev(label,code){devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
+async function dev(label,code){kpJobName='The Dev tool "'+label+'"';devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
 const DEV={
@@ -122,6 +122,15 @@ const DEV={
  katas:()=>dev('Katas','import r4_bot2_katas as m; m.main()'),
  packages:()=>dev('Packages','import r4_drop_packages as m\nawait m.amain()'),
  patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()'),
+ help:()=>dev('❓ Help guide','import r6_eight_help as m\nm.main()'),
+ cells:()=>dev('🧩 Cell runner (# %%)','import r6_dyno_cells as m\nm.main()'),
+ time:()=>dev('🕒 Time & cron','import tzdata  # loads time-zone data in the browser\nimport r6_forlor_time as m\nm.main()'),
+ audit:()=>dev('🛡 Dependency audit','import r6_getback_audit as m\nm.main()'),
+ merge:()=>dev('🔀 3-way merge','import r6_drop_merge as m\nawait m.amain()'),
+ bigo:()=>dev('📈 Big-O estimator','import r6_bot3_bigo as m\nm.main()'),
+ cheats:()=>dev('📝 Cheat sheets','import r6_bot2_cheats as m\nm.main()'),
+ logs:()=>dev('📜 Log analyzer','import r6_bot2help_logs as m\nm.main()'),
+
  board:()=>dev('✅ Task board','import r5_eight_todo as m\nm.main()'),
  testgen:()=>dev('🧪 Test generator','import r5_dyno_testgen as m\nm.main()'),
  apis:()=>dev('📮 API collections','import r5_forlor_apiclient as m\nf = m.main()\nif f is not None: await f'),
@@ -160,7 +169,7 @@ $('f-new').onclick=()=>{const n=prompt('New script name?');if(n){newScript(n.tri
 async function offStatus(){const el=$('offstat');if(!('serviceWorker'in navigator)){el.textContent='⚠️ No offline';return}
  const reg=await navigator.serviceWorker.ready.catch(()=>null);const sw=navigator.serviceWorker.controller||reg?.active;if(!sw){el.textContent='…';return setTimeout(offStatus,3000)}
  const ch=new MessageChannel();const r=await new Promise(res=>{ch.port1.onmessage=e=>res(e.data);sw.postMessage({kpStatus:1},[ch.port2]);setTimeout(()=>res(null),4000)});
- if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=r.ver+': everything is cached'}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
+ if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=(r.ver===KP_APPV?'':'⚠️ page '+KP_APPV+' vs ')+'cache '+r.ver+': everything is cached'+(r.ver===KP_APPV?'':' (reload to finish updating)')}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
 offStatus();
 
 $('go-scan').onclick=e=>{e.preventDefault();showView('v-dev');DEV.secrets()};
@@ -191,3 +200,9 @@ $('st-add').onclick=()=>{if(sitesBusy){$('st-msg').textContent='Still applying t
 $('st-in').onkeydown=e=>{if(e.key==='Enter')$('st-add').click()};
 $('st-reset').onclick=()=>{if(prompt('Remove all your sites and keep only the defaults? Type RESET:')!=='RESET')return;S('kp_sites',[]);applySites('Reset to defaults')};
 renderSites();
+
+/* v8: undo the last saved-script change made through the Python bridge (page-side snapshots, last 20) */
+$('bk-undo').onclick=()=>{let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]')}catch(e){}if(!Array.isArray(s)||!s.length){toast2('No Python changes to undo');return}
+ const last=s[s.length-1];if(!last||typeof last.name!=='string'||typeof last.text!=='string'){s.pop();LS.setItem('kp_snaps',JSON.stringify(s));return}
+ if(!confirm(`Restore "${last.name}" to how it was before the Python change at ${last.ts.slice(0,16).replace('T',' ')} UTC?`))return;
+ s.pop();LS.setItem('kp_snaps',JSON.stringify(s));if(['__proto__','constructor','prototype'].includes(last.name))return;scripts[last.name]=last.text;persist();refresh();if(last.name===cur)cm.setValue(last.text);toast2('Restored "'+last.name+'"')};

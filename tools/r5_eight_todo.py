@@ -180,7 +180,10 @@ def main():
             elif c == "3":
                 text = input("Task: ").strip()
                 if text:
-                    pri = input("Priority (high/med/low) [med]: ").strip().lower() or "med"
+                    while True:  # KPython: reject anything but high/med/low
+                        pri = input("Priority (high/med/low) [med]: ").strip().lower() or "med"
+                        if pri in PRIORITIES: break
+                        print("Type high, med or low.")
                     print("Added #%d" % add_task(tasks, text, pri)["id"])
                     dirty = True
             elif c in ("4", "5", "6"):

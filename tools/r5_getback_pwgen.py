@@ -211,8 +211,12 @@ def _ask_int(prompt, default, lo, hi):
 
 
 def _yes(prompt, default=True):
-    s = input("%s (%s): " % (prompt, "Y/n" if default else "y/N")).strip().lower()
-    return default if not s else s.startswith("y")
+    while True:  # KPython: only blank, y/yes or n/no are accepted
+        s = input("%s (%s): " % (prompt, "Y/n" if default else "y/N")).strip().lower()
+        if not s: return default
+        if s in ("y", "yes"): return True
+        if s in ("n", "no"): return False
+        print("Please type y or n.")
 
 
 def self_test():

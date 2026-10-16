@@ -307,10 +307,13 @@ def _apply(src, new, msg, path=None, name="pasted.py"):
 
 def _run(kind, src, path=None, name="pasted.py"):
     if kind == "1":
-        a, b = input("Lines A-B (e.g. 5-9): ").replace(" ", "").split("-")
+        r = input("Lines A-B (e.g. 5-9): ").replace(" ", "")
+        if not __import__("re").fullmatch(r"\d+-\d+", r): print("Use the form 5-9."); return
+        a, b = r.split("-")
         new, msg = extract(src, a, b, input("New function name: ").strip())
     elif kind == "2":
         nm = input("Variable name: ").strip(); ln = input("Line of assignment (Enter to skip): ").strip()
+        if ln and not ln.isdigit(): print("Line must be a number (or Enter to skip)."); return
         new, msg = inline(src, nm, int(ln) if ln else None)
     else:
         new, n, sk = to_fstrings(src)
@@ -336,7 +339,11 @@ def loop():
     ast.parse(new)
     assert "def calc(r, scale):" in new and "    return big" in new, new
     assert "    big = calc(r, scale)" in new and new.index("def calc") < new.index("def area"), new
-    ns = {}; exec(new, ns); assert abs(ns["area"](1, 1) - 2 * 3.141592653589793) < 1e-9
+    import io, contextlib
+    ns = {}
+    with contextlib.redirect_stdout(io.StringIO()):
+        exec(new, ns); _a = ns["area"](1, 1)
+    assert abs(_a - 2 * 3.141592653589793) < 1e-9
     new, _ = extract(s1, 7, 7, "show")
     assert "    show(big)" in new and "def show(big):" in new and "return" not in new.split("def show")[1].split("def area")[0]
     for a, b in [(3, 5), (12, 13), (8, 8), (11, 11)]:

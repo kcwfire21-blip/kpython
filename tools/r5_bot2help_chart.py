@@ -283,21 +283,28 @@ def read_pasted():
     return "\n".join(lines)
 
 
-def _pick(prompt, options, allow_blank=False):
+def _pick(prompt, options, allow_blank=False, allowed=None):
+    """KPython: numbers stay the same for every list (allowed= limits which can be picked);
+    names work too (any case); blank or q goes back."""
     for i, o in enumerate(options, 1):
-        print("  %d) %s" % (i, o))
+        print("  %d) %s%s" % (i, o, "" if allowed is None or o in allowed else "  (not numeric)"))
     while True:
-        a = _ask(prompt)
+        a = _ask(prompt + "(blank or q = back) ")
         if a is None:
             return None
         a = a.strip()
-        if allow_blank and a == "":
-            return ""
+        if a == "":
+            return "" if allow_blank else None
+        if a.lower() == "q":
+            return None
+        pick = None
         if a.isdigit() and 1 <= int(a) <= len(options):
-            return options[int(a) - 1]
-        if a in options:
-            return a
-        print("Invalid choice.")
+            pick = options[int(a) - 1]
+        else:
+            pick = next((o for o in options if str(o).lower() == a.lower()), None)
+        if pick is not None and (allowed is None or pick in allowed):
+            return pick
+        print("Invalid choice. Pick a number or name from the list, or blank to go back.")
 
 
 def _yes(msg):
@@ -341,14 +348,14 @@ def main(base_dir=None, force_text=False):
                 if kind == "hist":
                     if not num:
                         print("No numeric columns."); continue
-                    x = _pick("Column: ", num)
+                    x = _pick("Column: ", cols, allowed=num)
                     b = (_ask("Bins [10]: ") or "").strip()
                     bins = int(b) if b.isdigit() and int(b) > 0 else 10
                 else:
                     x = _pick("X column: ", cols)
                     if not num:
                         print("No numeric columns for Y."); continue
-                    y = _pick("Y column: ", num)
+                    y = _pick("Y column: ", cols, allowed=num)
                 if x is None or (kind != "hist" and y is None):
                     continue
                 text = text_chart(kind, rows, x, y, bins)
@@ -448,7 +455,7 @@ def run_selftests(verbose=True):
             check("mpl no data", raises(lambda: mpl_figure("hist", rows, "note")))
         # forced-text menu run via fake stdin
         old_in, old_out = sys.stdin, sys.stdout
-        sys.stdin = io.StringIO("2\nd.csv\n4\nbar\n1\n1\ny\nmenu_out\nq\n")
+        sys.stdin = io.StringIO("2\nd.csv\n4\nbar\n1\n2\ny\nmenu_out\nq\n")
         sys.stdout = io.StringIO()
         import builtins as _kpb
         _kp_in = _kpb.input

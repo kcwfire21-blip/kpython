@@ -237,3 +237,16 @@ try:
     _ph.open_url, _ph.pyfetch = _kp_open_url, _kp_pyfetch
 except Exception:
     pass
+
+
+# ---- v8: Stop / cancelled input() end the run cleanly ----
+# Pyodide's event loop re-raises KeyboardInterrupt (a BaseException) out of the task, which showed up as an
+# "Uncaught (in promise)" error in the console. Converting it here keeps the same message for the app.
+class KPStopped(Exception):
+    pass
+async def _kp_run_code(code, ns, filename):
+    from pyodide.code import eval_code_async
+    try:
+        return await eval_code_async(code, globals=ns, filename=filename)
+    except KeyboardInterrupt as e:
+        raise KPStopped("KeyboardInterrupt: " + str(e)) from None

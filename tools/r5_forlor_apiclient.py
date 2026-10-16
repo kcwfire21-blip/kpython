@@ -167,7 +167,7 @@ def main():
         names = list(data["requests"])
         try:
             if c == "q": return
-            if c == "s": return self_test()
+            if c == "s": self_test(); continue  # KPython: back to the menu
             if c == "v":
                 k = input("Variable name: ").strip(); v = input("Value (blank to remove): ")
                 if is_secret(k): print("Secret-looking names aren't stored. Put them in a header instead."); continue
