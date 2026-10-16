@@ -1,0 +1,54 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Keivon's Python</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="KPython">
+<meta name="theme-color" content="#111111"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111;color:#eee;font:16px -apple-system,system-ui,sans-serif;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom)}
+button,select,input{font:inherit;border-radius:10px;border:1px solid #333;background:#222;color:#eee;padding:10px}
+#lock{position:fixed;inset:0;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:9}
+#lock input{width:220px;text-align:center;font-size:24px}
+header{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 0}header h1{font-size:18px;margin:0 auto 0 0}
+#code{width:100%;height:42vh;background:#000;color:#9fef00;font:14px/1.4 Menlo,monospace;border:1px solid #333;border-radius:10px;padding:10px;tab-size:4}
+#run{width:100%;font-size:22px;font-weight:bold;background:#3776ab;margin:8px 0;padding:14px}
+#out{background:#000;border:1px solid #333;border-radius:10px;padding:10px;min-height:20vh;white-space:pre-wrap;font:13px Menlo,monospace}
+.err{color:#ff6b6b}.sys{color:#888}#sel{flex:1;min-width:140px}
+</style></head><body>
+<div id="lock"><h2>🔒 Keivon's Python</h2><div id="lmsg"></div><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button id="lbtn">Unlock</button></div>
+<header><h1>🐍 KPython</h1><button id="lockbtn">🔒</button></header>
+<header><select id="sel"></select><button id="new">New</button><button id="save">Save</button><button id="ren">Rename</button><button id="del">Delete</button></header>
+<textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+<button id="run" disabled>Loading Python…</button><button id="clr">Clear output</button>
+<div id="out"></div>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const $=id=>document.getElementById(id),LS=localStorage;
+async function sha(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function setupLock(){const h=LS.getItem('kp_pass');$('lmsg').textContent=h?'Enter passcode':'Create a passcode (4+ characters)';$('lock').style.display='flex';$('pin').value='';$('pin').focus()}
+$('lbtn').onclick=async()=>{const v=$('pin').value,h=LS.getItem('kp_pass');
+ if(!h){if(v.length<4)return $('lmsg').textContent='Use at least 4 characters';LS.setItem('kp_pass',await sha(v));$('lock').style.display='none'}
+ else if(await sha(v)===h)$('lock').style.display='none';else{$('lmsg').textContent='Wrong passcode';$('pin').value=''}};
+$('pin').onkeydown=e=>{if(e.key==='Enter')$('lbtn').click()};$('lockbtn').onclick=setupLock;
+const STARTERS={"Hello World":'name = input("What\'s your name? ")\nprint(f"Hello, {name}! Python is running on your phone.")',
+"Cleaning Quote":'# Quote + tip calculator for my cleaning business\nsqft = float(input("Square feet: ") or 1500)\nrate = float(input("Rate per sq ft ($): ") or 0.10)\nvisits = int(input("Visits per month: ") or 4)\nper_visit = max(sqft * rate, 75)\nmonthly = per_visit * visits\nprint(f"Per visit: ${per_visit:,.2f}")\nprint(f"Monthly ({visits} visits): ${monthly:,.2f}")\nfor pct in (15, 18, 20):\n    print(f"  {pct}% tip on one visit: ${per_visit*pct/100:,.2f}")',
+"Interview Countdown":'from datetime import datetime, timezone, timedelta\nct = timezone(timedelta(hours=-5))\ndeadline = datetime(2026, 10, 18, 23, 59, tzinfo=ct)\nleft = deadline - datetime.now(ct)\nif left.total_seconds() > 0:\n    h, m = divmod(int(left.total_seconds())//60, 60)\n    print(f"US Foods interview due in {h//24}d {h%24}h {m}m")\nelse:\n    print("Deadline passed")'};
+let scripts=JSON.parse(LS.getItem('kp_scripts')||'null')||STARTERS,cur=LS.getItem('kp_cur')||Object.keys(scripts)[0];
+const persist=()=>{LS.setItem('kp_scripts',JSON.stringify(scripts));LS.setItem('kp_cur',cur)};
+function refresh(){if(!(cur in scripts))cur=Object.keys(scripts)[0]||'';$('sel').innerHTML=Object.keys(scripts).map(n=>`<option>${n.replace(/</g,'&lt;')}</option>`).join('');$('sel').value=cur;$('code').value=scripts[cur]||'';persist()}
+$('sel').onchange=()=>{scripts[cur]=$('code').value;cur=$('sel').value;refresh()};
+$('save').onclick=()=>{if(!cur)return $('new').click();scripts[cur]=$('code').value;persist();log('Saved '+cur,'sys')};
+$('new').onclick=()=>{const n=prompt('Script name?');if(!n||n in scripts)return;scripts[cur]=$('code').value;scripts[n]='print("hi")';cur=n;refresh()};
+$('ren').onclick=()=>{const n=prompt('New name',cur);if(!n||n===cur||n in scripts)return;scripts[n]=$('code').value;delete scripts[cur];cur=n;refresh()};
+$('del').onclick=()=>{if(!cur||!confirm('Delete '+cur+'?'))return;delete scripts[cur];cur='';refresh()};
+$('code').onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();document.execCommand('insertText',false,'    ')}};
+function log(t,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';$('out').appendChild(s);$('out').scrollIntoView({block:'end'})}
+$('clr').onclick=()=>$('out').textContent='';
+let py;(async()=>{try{py=await loadPyodide();py.setStdout({batched:t=>log(t)});py.setStderr({batched:t=>log(t,'err')});
+ py.setStdin({stdin:()=>{const v=prompt('input():');return v===null?'':v}});$('run').disabled=false;$('run').textContent='▶ Run';log('Python '+py.version+' ready','sys')}
+ catch(e){$('run').textContent='Python failed to load';log(String(e),'err')}})();
+$('run').onclick=async()=>{scripts[cur]=$('code').value;persist();log('— run '+cur+' —','sys');$('run').disabled=true;
+ try{const r=await py.runPythonAsync($('code').value);if(r!==undefined&&r!==null)log(String(r))}catch(e){log(String(e.message||e),'err')}$('run').disabled=false};
+refresh();setupLock();
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');
+</script></body></html>
