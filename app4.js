@@ -121,7 +121,17 @@ const DEV={
  convert:()=>dev('Convert','import r4_forlor_convert as m; m.main()'),
  katas:()=>dev('Katas','import r4_bot2_katas as m; m.main()'),
  packages:()=>dev('Packages','import r4_drop_packages as m\nawait m.amain()'),
- patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()')};
+ patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()'),
+ board:()=>dev('✅ Task board','import r5_eight_todo as m\nm.main()'),
+ testgen:()=>dev('🧪 Test generator','import r5_dyno_testgen as m\nm.main()'),
+ apis:()=>dev('📮 API collections','import r5_forlor_apiclient as m\nf = m.main()\nif f is not None: await f'),
+ pwgen:()=>dev('🔑 Passwords','import r5_getback_pwgen as m\nm.main()'),
+ search:()=>dev('🔍 Project search','import r5_drop_search as m\nm.main()'),
+ savedrepl:()=>dev('✏️ Replace in saved scripts','import r5_drop_search as m\nawait m.saved_replace()'),
+ compare:()=>dev('⏱ Compare speed','import r5_bot3_timeit as m\nm.main()'),
+ explain:()=>dev('📖 Explain code','import r5_bot2_explain as m\nm.main()'),
+ chart:()=>dev('📊 Charts','import r5_bot2help_chart as m\nm.main()'),
+ refactor:()=>dev('🛠 Refactor','import r5_bot_refactor as m\nm.main()')};
 document.querySelectorAll('[data-dev]').forEach(b=>b.onclick=()=>{if(running)return toast('Python is busy (tap ⏹ Stop)');DEV[b.dataset.dev]()});
 function devSelects(){const o=Object.keys(scripts).map(n=>`<option>${esc(n)}</option>`).join('');['dv-a','dv-b'].forEach((id,i)=>{const v=$(id).value;$(id).innerHTML=o;$(id).value=v&&v in scripts?v:Object.keys(scripts)[Math.min(i,Object.keys(scripts).length-1)]})}
 window.addEventListener('click',e=>{if(e.target.closest('#tabs [data-v="v-dev"]'))devSelects()});devSelects();
@@ -164,14 +174,16 @@ async function syncSites(){if(!('serviceWorker'in navigator))return;const l=getS
 function renderSites(){const l=getSites();$('st-list').innerHTML=l.map((s,i)=>`<div class="item"><span>${esc(s)}</span><button data-i="${i}">✕</button></div>`).join('')||'<p class="hint">None added.</p>';
  $('st-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{const s=l[+b.dataset.i];if(!confirm('Remove '+s+'?'))return;S('kp_sites',l.filter(x=>x!==s));applySites('Removed '+s)});
  $('st-def').innerHTML=SITE_DEFAULTS.map(esc).join('<br>')}
-async function applySites(msg){renderSites();$('st-msg').textContent=msg+'. Restarting Python to apply…';toast2('Restarting Python to apply');
+async function applySites(msg){sitesBusy=true;$('st-add').disabled=true;try{await applySites0(msg)}finally{sitesBusy=false;$('st-add').disabled=false}}
+async function applySites0(msg){renderSites();$('st-msg').textContent=msg+'. Restarting Python to apply…';toast2('Restarting Python to apply');
  try{await syncSites()}catch(e){$('st-msg').textContent=msg+'. (Service worker not ready; reload the app to apply.)';return}
  if(running){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Restarted to apply Allowed sites.'}));pend={};inputMsg=null}else W.terminate();
  startWorker();await pyReady;$('st-msg').textContent=msg+'. Applied.'}
-$('st-add').onclick=()=>{const r=kpParseSite($('st-in').value);if(r.error){$('st-msg').textContent='❌ '+r.error;return}
+let sitesBusy=false;
+$('st-add').onclick=()=>{if(sitesBusy){$('st-msg').textContent='Still applying the last change… try again in a moment.';return}const r=kpParseSite($('st-in').value);if(r.error){$('st-msg').textContent='❌ '+r.error;return}
  const l=getSites();if(l.includes(r.origin)){$('st-msg').textContent='Already in the list.';return}if(l.length>=KP_SITES_MAX){$('st-msg').textContent='List is full (50).';return}
  let warn='';if(r.kind==='ip')warn='\n\n⚠️ This is a raw IP address. Only allow it if you know exactly what it is.';
- if(r.kind==='local')warn='\n\n⚠️ This is localhost or a Tailscale (100.x) address: a device on your own network. Scripts will be able to talk to it.';
+ if(r.kind==='local')warn='\n\n⚠️ Private network address (localhost, Tailscale 100.x, or a home/office network like 10.x, 172.16–31.x, 192.168.x). Scripts will be able to talk to that device.';
  if(r.origin.includes('*.'))warn+='\n\nThe * allows every subdomain of that site.';
  if(r.kind==='ip'&&prompt(`Raw IP address ${r.origin}. Type IP to confirm it's intended:`)!=='IP'){$('st-msg').textContent='Cancelled.';return}
  const t=prompt(`Allow Python to connect to\n${r.origin}${warn}\n\nType yes to add:`);if((t||'').trim().toLowerCase()!=='yes'){$('st-msg').textContent='Cancelled.';return}

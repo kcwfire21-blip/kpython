@@ -64,3 +64,5 @@ pre.docs{max-height:45vh;overflow:auto;font-size:12px;white-space:pre-wrap}
 #keybar button{min-width:44px;min-height:44px}
 #out .ehint,.console .ehint{color:#e3b341}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#238636;color:#fff;padding:10px 16px;border-radius:12px;opacity:0;transition:opacity .2s;z-index:3000;pointer-events:none;font-size:14px}#toast.on{opacity:1}
+.etools{flex-wrap:wrap}.etools #e-share{flex:1 0 100%;order:9}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g2 button{min-width:0;white-space:normal;overflow-wrap:anywhere}

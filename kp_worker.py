@@ -149,7 +149,15 @@ def _kp_hist_load(data_json):
 # ---- v6: round-4 team tools ----
 def _kp_cover(src):
     m = _kp_tool('r4_dyno_coverage'); print("Coverage (Dyno). This runs your code and its unittest tests.")
-    exe, hits = m.cover(src, 'pass' if 'TestCase' in src else ''); print('\n'.join(m.report(src, exe, hits)))
+    import re as _re
+    tests = 'pass' if 'TestCase' in src else ''
+    if _re.search(r'^def test_\w*\(\s*\)', src, _re.M):  # pytest-style: also run plain test_ functions
+        tests += ("\n_kp_r = [0, 0]\nfor _kp_n, _kp_f in list(globals().items()):\n"
+                  "    if _kp_n.startswith('test_') and callable(_kp_f) and not isinstance(_kp_f, type):\n"
+                  "        try:\n            _kp_f(); _kp_r[0] += 1\n"
+                  "        except Exception as _kp_e:\n            _kp_r[1] += 1; print(f'FAIL {_kp_n}: {type(_kp_e).__name__}: {_kp_e}')\n"
+                  "print(f'pytest-style tests: {_kp_r[0]} passed, {_kp_r[1]} failed')\n")
+    exe, hits = m.cover(src, tests); print('\n'.join(m.report(src, exe, hits)))
 def _kp_memory(src):
     m = _kp_tool('r4_bot3_memory')
     if m.tracemalloc is None: return
@@ -180,3 +188,52 @@ def _kp_imports():
 def kp_pkgs_get(): return list(json.loads(js.kpPkgsGet()))
 def kp_pkgs_set(lst): js.kpPkgsSet(json.dumps(list(lst)))
 builtins.kp_pkgs_get, builtins.kp_pkgs_set = kp_pkgs_get, kp_pkgs_set
+
+
+# ---- v7: friendly error when Allowed sites blocks a request ----
+class KPBlockedError(ConnectionError):
+    """Raised when a request is blocked by Tools > Allowed sites."""
+builtins.KPBlockedError = KPBlockedError
+_KP_DEFAULT_SITES = ['https://api.github.com', 'https://cdn.jsdelivr.net', 'https://pypi.org', 'https://files.pythonhosted.org']
+def _kp_site_allowed(url):
+    from urllib.parse import urlsplit
+    import js, json
+    u = urlsplit(str(url))
+    if not u.scheme or not u.netloc:   # relative URL -> same origin
+        return True, ''
+    origin = f'{u.scheme}://{u.netloc}'.lower()
+    if origin == str(js.location.origin).lower():
+        return True, origin
+    for s in _KP_DEFAULT_SITES + json.loads(js.kpSitesGet()):
+        s = s.lower().rstrip('/')
+        if s == origin:
+            return True, origin
+        if '*.' in s:
+            pre, dom = s.split('*.', 1)
+            if origin.startswith(pre) and origin[len(pre):].endswith('.' + dom):
+                return True, origin
+    return False, origin
+def _kp_blocked(url, err):
+    ok, origin = _kp_site_allowed(url)
+    if ok:
+        return err
+    e = KPBlockedError(f"Blocked: {origin} isn't in Allowed sites. Add it in Tools > Allowed sites.")
+    e.__cause__ = None
+    return e
+try:
+    import pyodide.http as _ph
+    _kp_open_url0, _kp_pyfetch0 = _ph.open_url, _ph.pyfetch
+    def _kp_open_url(url, *a, **k):
+        try:
+            return _kp_open_url0(url, *a, **k)
+        except Exception as err:
+            raise _kp_blocked(url, err) from None
+    async def _kp_pyfetch(url, *a, **k):
+        try:
+            return await _kp_pyfetch0(url, *a, **k)
+        except Exception as err:
+            raise _kp_blocked(url, err) from None
+    _kp_open_url.__doc__, _kp_pyfetch.__doc__ = _kp_open_url0.__doc__, _kp_pyfetch0.__doc__
+    _ph.open_url, _ph.pyfetch = _kp_open_url, _kp_pyfetch
+except Exception:
+    pass

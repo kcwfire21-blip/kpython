@@ -69,30 +69,45 @@ window.kpT=(op,...a)=>{if(!tuCanvas){tuCanvas=document.createElement('canvas');t
 function clearT(c){const x=c.getContext('2d');x.fillStyle=c.dataset.bg||'#010409';x.fillRect(0,0,c.width,c.height)}
 
 /* ---------- Python (v4: runs in a Web Worker so Stop works) ---------- */
-const TOOLS=['r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py','r4_getback_secrets.py','r4_drop_packages.py','r4_bot3_memory.py','r4_bot2_katas.py','r4_bot2help_imports.py','r4_bot_docgen.py','r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
+const TOOLS=['r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py','r4_getback_secrets.py','r4_drop_packages.py','r4_bot3_memory.py','r4_bot2_katas.py','r4_bot2help_imports.py','r4_bot_docgen.py','r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py','r5_bot2_explain.py','r5_bot2help_chart.py','r5_bot3_timeit.py','r5_bot_refactor.py','r5_drop_search.py','r5_dyno_testgen.py','r5_eight_todo.py','r5_forlor_apiclient.py','r5_getback_pwgen.py'];
 const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
 let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
 function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
-async function startWorker(){newReady();if(typeof syncSites==="function")await syncSites().catch(()=>{});$('pystat').textContent='Loading Python…';$('pystat').classList.remove('ok');setRunBtns();
+// reinstall list: keep valid entries; drop the self-test's 'demo' package if an old version leaked it
+const cleanPkgs=l=>Array.isArray(l)?l.filter(s=>typeof s==='string'&&/^[\w.\-\[\]=<>]{1,120}$/.test(s)&&!/^demo(?:[=<>\[]|$)/i.test(s)):[];
+async function startWorker(){newReady();
+ // Python's network rules come from the service worker. Without it in control, worker.js would load with no Allowed-sites policy, so don't start.
+ if(!('serviceWorker'in navigator)||!navigator.serviceWorker.controller){$('pystat').textContent='Reload needed';
+  log('⚠️ Python is paused: the offline/safety layer is not active yet, so network rules (Allowed sites) would not apply. Reloading…','err');
+  if('serviceWorker'in navigator&&!sessionStorage.kp_swreload){sessionStorage.kp_swreload=1;await navigator.serviceWorker.ready;location.reload()}else log('Reload the app to start Python.','err');return}
+ sessionStorage.removeItem('kp_swreload');if(typeof syncSites==="function")await syncSites().catch(()=>{});$('pystat').textContent='Loading Python…';$('pystat').classList.remove('ok');setRunBtns();
  if(!setupTxt){setupTxt=await (await fetch('kp_setup.py')).text();wsetupTxt=await (await fetch('kp_worker.py')).text()}
  if(self.crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined'){SAB=new SharedArrayBuffer(12+65536);INTR=new Uint8Array(SAB,0,1);CTL=new Int32Array(SAB,4,2);DAT=new Uint8Array(SAB,12)}
  W=new Worker('worker.js');W.onmessage=onW;W.onerror=e=>log('Worker error: '+(e.message||e),'err');
- W.postMessage({cmd:'init',pkgs:J('kp_pkgs',[]),native:['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'],sab:SAB,setup:setupTxt,wsetup:wsetupTxt,tools:TOOLS})}
+ {const c=cleanPkgs(J('kp_pkgs',[]));S('kp_pkgs',c)}
+ W.postMessage({cmd:'init',pkgs:J('kp_pkgs',[]),native:['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'],sab:SAB,setup:setupTxt,wsetup:wsetupTxt,tools:TOOLS,sites:(typeof getSites==='function'?getSites():[])})}
 /* batched plain stdout: one DOM write per frame, pane keeps the last MAXL lines */
 let obuf=[],oraf=0,dropOut=false;const MAXL=5000;
-function bufOut(s){obuf.push(s);if(!oraf)oraf=requestAnimationFrame(flushOut)}
-function flushOut(){if(oraf){cancelAnimationFrame(oraf);oraf=0}if(!obuf.length)return;const o=outEl||$('out');const t=obuf.join('\n')+'\n';obuf=[];
+function bufOut(s,raw){obuf.push(raw?s:s+'\n');if(!oraf)oraf=requestAnimationFrame(flushOut)}
+function flushOut(){if(oraf){cancelAnimationFrame(oraf);oraf=0}if(!obuf.length)return;const o=outEl||$('out');const t=obuf.join('');obuf=[];
  const s=document.createElement('span');s.textContent=t;o.appendChild(s);trimOut(o);o.scrollTop=o.scrollHeight}
 function trimOut(o){let n=0;for(const c of o.childNodes)if(!c.classList?.contains('trimnote'))n+=(c.textContent.match(/\n/g)||[]).length;
  while(n>MAXL&&o.firstChild){const c=o.firstChild;const k=(c.textContent.match(/\n/g)||[]).length;if(n-k<MAXL&&c.nodeType===1&&c.tagName==='SPAN'){const ls=c.textContent.split('\n');c.textContent=ls.slice(n-MAXL).join('\n');n=MAXL;break}n-=k;c.remove()}
  if(n>=MAXL){o.querySelector('.trimnote')?.remove();const s=document.createElement('span');s.className='sys trimnote';s.textContent='(older output trimmed to last '+MAXL+' lines)\n';o.prepend(s)}}
 function onW(e){const m=e.data;
- if(m.t==='out'&&dropOut)return;if(m.t==='out'&&!m.c){bufOut(m.s);return}flushOut();
+ if(m.t==='out'&&dropOut)return;if(m.t==='out'&&!m.c){bufOut(m.s,m.raw);return}flushOut();
  if(m.t==='out')log(m.s,m.c);else if(m.t==='img')kpShowImg(m.b);else if(m.t==='turtle')kpT(...m.a);
  else if(m.t==='input')askInput(m);
- else if(m.t==='blocked'){log(`Blocked: ${m.o} isn't in Allowed sites. Add it in Tools > Allowed sites.`,'err')}
+ else if(m.t==='blocked'){if(m.job!==seq)return;const s=`Blocked: ${m.o} isn't in Allowed sites. Add it in Tools > Allowed sites.`;setTimeout(()=>{flushOut&&flushOut();if(!$('out').textContent.includes(s))log(s,'err')},400)}
  else if(m.t==='sites'||m.kpSites||m.kpGetSites){console.warn('Rejected: Python tried to change Allowed sites');log('⛔ Rejected: scripts cannot change Allowed sites.','err')}
- else if(m.t==='pkgs'){const l=Array.isArray(m.l)?m.l.filter(s=>typeof s==='string'&&/^[\w.\-\[\]=<>]{1,120}$/.test(s)):[];S('kp_pkgs',l)}
+ else if(m.t==='sget'){W.postMessage({cmd:'sres',id:m.id,v:JSON.stringify(scripts)})}
+ else if(m.t==='sset'){const name=String(m.name),text=String(m.text);let ok=false;
+  if(!(name in scripts)||text.length>500000)log('⛔ Rejected a script change from Python (unknown script or too big).','err');
+  else if(text!==scripts[name]){const d=text.split('\n').length-scripts[name].split('\n').length;
+   ok=confirm(`Python (${m.why||'a tool'}) wants to change your saved script "${name}".\n${scripts[name].length} → ${text.length} characters (${d>=0?'+':''}${d} lines).\nThe old version is saved in History first.\n\nAllow this change?`);
+   if(ok){scripts[name]=text;persist();if(name===cur)cm.setValue(text);toast2('Updated "'+name+'"')}}
+  W.postMessage({cmd:'sres',id:m.id,v:ok})}
+ else if(m.t==='pkgs'){const l=cleanPkgs(m.l);S('kp_pkgs',l)}
  else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');
   $('c-unit').innerHTML=m.units.map(k=>`<option>${esc(k)}</option>`).join('');readyRes();setRunBtns();log('Python '+m.v+' ready'+(m.sab?'':' (compat mode: Stop restarts Python)'),'sys')}
  else if(m.t==='fail'){$('pystat').textContent='Python offline';$('run').textContent='Python failed to load';log(m.s,'err')}
@@ -118,13 +133,13 @@ function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textCon
 async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;setRunBtns();outEl=target;tuCanvas=turtle;
  try{const r=await wcall(msg);if(!r.ok&&r.err)log(r.err,'err');return r}finally{outEl=null;tuCanvas=null;running=false;setRunBtns()}}
 async function runPy(code,o={}){const r=await job({cmd:'run',code,files:allFiles(),fname:'__kp_run__.py'},o);return r.ok}
-async function run(){try{cm.display.input.forceCompositionEnd?.();cm.display.input.poll?.()}catch(e){}clearTimeout(dirtyT);if(typeof setDirty==='function')setDirty(false);scripts[cur]=cm.getValue();persist();clearErr();log('— run '+cur+' —','sys');const t0=performance.now();
+async function run(){try{const i=cm.display.input;i.forceCompositionEnd?.();if(i.pollContent)i.pollContent();else i.poll?.()}catch(e){}/* read pending paste/IME text into the doc synchronously */clearTimeout(dirtyT);if(typeof setDirty==='function')setDirty(false);scripts[cur]=cm.getValue();persist();clearErr();log('— run '+cur+' —','sys');const t0=performance.now();
  const r=await job({cmd:'run',code:cm.getValue(),files:allFiles(),fname:modname(cur)+'.py'});log(`— ${r.ok?'done':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'stopped':'error')} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys')}
 $('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
 async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
 function toast2(t){let d=$('toast');if(!d){d=document.createElement('div');d.id='toast';document.body.appendChild(d)}d.textContent=t;d.classList.add('on');clearTimeout(d._t);d._t=setTimeout(()=>d.classList.remove('on'),2200)}
-setTimeout(startWorker,0); // after app4.js (syncSites) has loaded
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>startWorker());else setTimeout(startWorker,0); // after all scripts (app4.js: syncSites, linkify) load
 
 /* packages */
 async function installPkg(name){name=name.trim();if(!name)return;showView('v-code');log('Installing '+name+'…','sys');
@@ -209,10 +224,15 @@ const VALID={kp_hours:x=>Array.isArray(x)&&x.every(s=>s&&/^\d{4}-\d\d-\d\d$/.tes
  kp_sites:x=>Array.isArray(x)&&kpCleanSites(x).length===x.length,
  kp_pkgs:x=>Array.isArray(x)&&x.every(p=>typeof p==='string'&&/^[\w.\-\[\]=<>]+$/.test(p))};
 function validKey(k,v){if(typeof v!=='string')return false;if(!VALID[k])return true;try{return VALID[k](JSON.parse(v))}catch(e){return false}}
-function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||Array.isArray(d.scripts)||!Object.values(d.scripts).every(v=>typeof v==='string'))throw new Error('Not a valid KPython backup');
- scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;const bad=[];Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
+const BAD_NAMES=['__proto__','constructor','prototype'];
+function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||d.scripts===null||Array.isArray(d.scripts))throw new Error('Not a valid KPython backup');
+ const ent=Object.keys(d.scripts).filter(k=>Object.hasOwn(d.scripts,k)).map(k=>[k,d.scripts[k]]);
+ if(ent.length>500)throw new Error('Backup has more than 500 scripts');
+ const skipped=[];const ok={};for(const [k,v] of ent){if(typeof v!=='string'||!k||k.length>100||BAD_NAMES.includes(k)||v.length>2e6)skipped.push('script "'+String(k).slice(0,40)+'"');else ok[k]=v}
+ if(!Object.keys(ok).length&&ent.length)throw new Error('No valid scripts in backup');
+ const next=Object.assign(Object.create(null),scripts);for(const k in ok)next[k]=ok[k];scripts={...next};if(skipped.length)setTimeout(()=>alert('Skipped: '+skipped.join(', ')),0);cur=d.cur in scripts?d.cur:cur;const bad=[];const dd=(d.data&&typeof d.data==='object')?d.data:{};Object.keys(dd).filter(k=>Object.hasOwn(dd,k)).forEach(k=>{const v=dd[k];if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}else bad.push(k+' (unknown)')});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
-$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.data&&'kp_sites'in d.data&&typeof applySites==='function')applySites('Imported Allowed sites');if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
+$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>10*1024*1024){alert('Backup file is over 10 MB; not imported.');e.target.value='';return}try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.data&&'kp_sites'in d.data&&typeof applySites==='function')applySites('Imported Allowed sites');if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 

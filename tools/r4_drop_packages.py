@@ -372,6 +372,8 @@ async def self_tests_async():
             builtins.input = real_input
         check(r is False and len(done) == 1, "install cancelled")
 
+    global _hook
+    old_hook, _hook = _hook, (lambda name: None)  # KPython v7: self-test uses a temp list, never the app's real reinstall list
     old = BASE_DIR
     BASE_DIR = tempfile.mkdtemp()
     try:
@@ -380,6 +382,7 @@ async def self_tests_async():
     finally:
         shutil.rmtree(BASE_DIR, ignore_errors=True)
         BASE_DIR = old
+        _hook = old_hook
     print(f"Self-tests: {ok} passed, {fail} failed")
     return fail == 0
 
