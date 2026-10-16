@@ -89,3 +89,35 @@ def safe_path(p, base=HOME):
         raise ValueError(f"refused: {p} is outside {base}")
     return full
 builtins.kp_safe_path = safe_path
+
+# ---- v5: round-3 team tools (security-patched copies in /home/pyodide/kptools) ----
+_KP_TOKEN = re.compile(r"(eyJ[\w-]+\.[\w-]+\.[\w-]*|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-[\w-]{16,}|AKIA[0-9A-Z]{16}|xox[abpr]-[\w-]{10,})")
+_kp_prev_input = builtins.input
+def _kp_input3(prompt=''):
+    sys.stdout.flush()
+    if prompt: print(prompt, end='')
+    sys.stdout.flush()
+    v = js.prompt(str(prompt) or 'input()')
+    if v is None:
+        print(); raise KeyboardInterrupt('input cancelled')
+    v = str(v)
+    if _KP_SECRET.match(v): shown = v.split(':', 1)[0] + ': ****(hidden)'
+    else: shown = _KP_TOKEN.sub(lambda m: m.group(0)[:4] + '****(hidden)', v)
+    print(shown)
+    return v
+builtins.input = _kp_input3
+def _kp_format(src):
+    return _kp_tool('r3_eight_format').format_code(src)
+def _kp_debug(src):
+    m = _kp_tool('r3_bot3_debugger')
+    print("Step debugger (bot3). This RUNS your code. Commands: s step, n next, c continue, b N breakpoint, p locals, p EXPR, q quit, h help")
+    m.Debugger(src).run()
+def _kp_metrics(src):
+    m = _kp_tool('r3_bot2help_metrics'); print(m.format_report(m.analyze(src)))
+def _kp_types(src):
+    _kp_tool('r3_bot_typecheck').report(src)
+def _kp_snapshot(name, src, msg):
+    m = _kp_tool('r3_drop_history'); rel = _kp_modname(name) + '.py'
+    with open(safe_path(rel), 'w') as f: f.write(src)
+    m.save_version(rel, msg or 'snapshot from KPython')
+    m.list_versions(rel)

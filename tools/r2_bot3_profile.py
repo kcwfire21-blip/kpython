@@ -41,7 +41,9 @@ def profile_code(code, setup="pass", top=15):
 
 def ask_int(prompt, default):
     raw = input(f"{prompt} [{default}]: ").strip()
-    return int(raw) if raw.isdigit() and int(raw) > 0 else default
+    if raw.lower() in ("q", "quit"): raise ValueError("cancelled")
+    if raw and not (raw.isdigit() and int(raw) > 0): raise ValueError(f"{raw!r} is not a positive whole number")
+    return int(raw) if raw else default
 
 def main():
     while True:

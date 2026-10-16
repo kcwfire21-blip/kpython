@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id),LS=localStorage;
 const J=(k,d)=>{try{const v=JSON.parse(LS.getItem(k));return v??d}catch(e){return d}},S=(k,v)=>LS.setItem(k,JSON.stringify(v));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money=n=>'$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=n=>((+n||0)<0?'-$':'$')+Math.abs(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 // haptic-feel feedback
 document.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(!b)return;b.classList.add('tap');if(navigator.vibrate)navigator.vibrate(8);setTimeout(()=>b.classList.remove('tap'),120)});
@@ -40,7 +40,7 @@ function refresh(){if(!(cur in scripts))cur=Object.keys(scripts)[0]||'';$('sel')
 $('sel').onchange=()=>{scripts[cur]=cm.getValue();cur=$('sel').value;refresh()};
 $('save').onclick=()=>{if(!cur)return $('new').click();clearTimeout(dirtyT);scripts[cur]=cm.getValue();persist();setDirty(false);log('Saved '+cur,'sys')};
 function newScript(name,code){let n=name,i=2;while(n in scripts)n=name+' '+i++;if(cur)scripts[cur]=cm.getValue();scripts[n]=code;cur=n;refresh();return n}
-$('new').onclick=()=>{const n=prompt('Script name?');if(n)newScript(n,'print("hi")\n')};
+$('new').onclick=()=>{const n=prompt('Script name?','Untitled');if(n===null)return;newScript(n.trim()||'Untitled','print("hi")\n');toast2('Created "'+cur+'"');cm.focus()};
 $('snipbtn').onclick=()=>{showView('v-files');setTimeout(()=>$('snip-list').scrollIntoView({behavior:'smooth'}),50)};
 
 /* keybar */
@@ -69,7 +69,7 @@ window.kpT=(op,...a)=>{if(!tuCanvas){tuCanvas=document.createElement('canvas');t
 function clearT(c){const x=c.getContext('2d');x.fillStyle=c.dataset.bg||'#010409';x.fillRect(0,0,c.width,c.height)}
 
 /* ---------- Python (v4: runs in a Web Worker so Stop works) ---------- */
-const TOOLS=['r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
+const TOOLS=['r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
 const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
 let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
 function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
@@ -106,12 +106,12 @@ function askInput(m){inputMsg=m;const o=outEl||$('out');const row=document.creat
 function answerInput(v){const m=inputMsg;inputMsg=null;if(!m)return;
  if(m.mode==='sab'){if(v!==null){const b=new TextEncoder().encode(v).slice(0,65536);DAT.set(b);Atomics.store(CTL,1,b.length)}Atomics.store(CTL,0,v===null?-1:1);Atomics.notify(CTL,0)}
  else navigator.serviceWorker.controller?.postMessage({kpInput:m.id,v:v??'',cancel:v===null})}
-async function stopPy(){if(!running)return;log('⏹ Stopping…','sys');document.querySelectorAll('.inrow').forEach(r=>r.remove());
+async function stopPy(){if(!running)return;log('⏹ Stopping…','sys');$('stop').textContent='Stopping…';$('stopbtn').textContent='…';document.querySelectorAll('.inrow').forEach(r=>r.remove());
  if(inputMsg)answerInput(null);
- if(INTR){INTR[0]=2;const t=Date.now();while(running&&Date.now()-t<1500)await new Promise(r=>setTimeout(r,50));if(!running)return}
+ if(INTR){INTR[0]=2;const t=Date.now();while(running&&Date.now()-t<1000)await new Promise(r=>setTimeout(r,50));if(!running)return}
  hardRestart()}
 function hardRestart(){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Stopped. Python was restarted (console variables were cleared).'}));pend={};inputMsg=null;startWorker()}
-function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textContent=busy?'Running…':'▶ Run';$('stop').hidden=!busy;$('stopbtn').hidden=!busy;$('r-go').disabled=busy}
+function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textContent=busy?'Running…':'▶ Run';$('stop').hidden=!busy;$('stopbtn').hidden=!busy;if(!busy){$('stop').textContent='⏹ Stop';$('stopbtn').textContent='⏹'}$('r-go').disabled=busy}
 async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;setRunBtns();outEl=target;tuCanvas=turtle;
  try{const r=await wcall(msg);if(!r.ok&&r.err)log(r.err,'err');return r}finally{outEl=null;tuCanvas=null;running=false;setRunBtns()}}
 async function runPy(code,o={}){const r=await job({cmd:'run',code,files:allFiles(),fname:'__kp_run__.py'},o);return r.ok}
@@ -120,6 +120,7 @@ async function run(){scripts[cur]=cm.getValue();persist();clearErr();log('— ru
 $('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
 async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
+function toast2(t){let d=$('toast');if(!d){d=document.createElement('div');d.id='toast';document.body.appendChild(d)}d.textContent=t;d.classList.add('on');clearTimeout(d._t);d._t=setTimeout(()=>d.classList.remove('on'),2200)}
 startWorker();
 
 /* packages */
@@ -153,7 +154,7 @@ $('h-add').onclick=()=>{const s={id:Date.now(),date:$('h-date').value||today(),s
 // budget
 $('b-date').value=today();
 function renderBudget(){const L=J('kp_budget',[]).filter(e=>e&&typeof e.date==='string'&&isFinite(e.amt)).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);let bal=0,inc=0,exp=0;
- const rows=L.map(e=>{const v=e.type==='in'?e.amt:-e.amt;bal+=v;e.type==='in'?inc+=e.amt:exp+=e.amt;return `<div class="item"><span>${esc(e.date)} ${esc(e.desc)}</span><span><b class="${e.type==='in'?'amt-in':'amt-out'}">${e.type==='in'?'+':'−'}${money(e.amt)}</b> <small class="hint">${money(bal)}</small> <button data-id="${esc(e.id)}">✕</button></span></div>`});
+ const rows=L.map(e=>{const v=e.type==='in'?e.amt:-e.amt;bal+=v;e.type==='in'?inc+=e.amt:exp+=e.amt;return `<div class="item"><span>${esc(e.date)} ${esc(e.desc)}</span><span><b class="${e.type==='in'?'amt-in':'amt-out'}">${e.type==='in'?'+':'−'}${money(e.amt)}</b> <small class="hint" title="running balance">bal ${money(bal)}</small> <button data-id="${esc(e.id)}">✕</button></span></div>`});
  $('b-sum').innerHTML=`Balance <span class="${bal>=0?'amt-in':'amt-out'}" style="color:${bal>=0?'var(--ok)':'var(--bad)'}">${money(bal)}</span> · in ${money(inc)} · out ${money(exp)}`;
  $('b-list').innerHTML=rows.reverse().join('')||'<p class="hint">No entries yet.</p>';
  $('b-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(confirm('Delete entry?')){S('kp_budget',J('kp_budget',[]).filter(s=>s.id!=b.dataset.id));renderBudget()}})}
@@ -207,7 +208,7 @@ function validKey(k,v){if(typeof v!=='string')return false;if(!VALID[k])return t
 function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||Array.isArray(d.scripts)||!Object.values(d.scripts).every(v=>typeof v==='string'))throw new Error('Not a valid KPython backup');
  scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;const bad=[];Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
-$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
+$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 

@@ -42,7 +42,7 @@ $('e-share').onclick=async()=>{scripts[cur]=cm.getValue();persist();const name=m
  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();log('Exported '+name,'sys')};
 $('e-imp').onclick=()=>$('e-file').click();
-$('e-file').onchange=async e=>{for(const f of e.target.files){if(f.size>2e6){log(f.name+' too big (2 MB max)','err');continue}newScript(f.name.replace(/\.py$/,''),await f.text());log('Imported '+f.name,'sys')}e.target.value=''};
+$('e-file').onchange=async e=>{for(const f of e.target.files){if(f.size>2e6){log(f.name+' too big (2 MB max)','err');continue}newScript(f.name.replace(/\.py$/,''),await f.text());toast2('Imported '+f.name);log('Imported '+f.name,'sys')}e.target.value=''};
 /* ---- REPL ---- */
 const RH=J('kp_rhist',[]);let rhi=RH.length,rbuf=[];
 function rlog(t,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';$('r-out').appendChild(s);$('r-out').scrollTop=1e9}
@@ -79,22 +79,34 @@ $('d-q').onkeydown=e=>{if(e.key==='Enter')$('d-go').click()};
 document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.textContent;$('d-go').click()});
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
-async function dev(label,code){devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':'— stopped/error —')+'\n';t.appendChild(s);return r}
+async function dev(label,code){devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':'— stopped/error —')+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
 const DEV={
  lint:()=>dev('Lint '+cur,`print("Lint: ${cur.replace(/[\\"]/g,'')}  (Eight's checker, never runs your code)")\n_kp_lint(${J2(curSrc())})`),
- tests:()=>confirm(`Run tests? This executes "${cur}".`)&&dev('Tests '+cur,`_kp_tests(${J2(curSrc())}, ${J2(cur)})`),
+ tests:()=>!confirm(`Run tests? This executes "${cur}".`)?(devOut().textContent='Cancelled.'):dev('Tests '+cur,`_kp_tests(${J2(curSrc())}, ${J2(cur)})`),
  outline:()=>dev('Outline '+cur,`_kp_outline(${J2(curSrc())})`),
  rename:async()=>{const o=prompt('Rename which name? (token-safe: skips strings and comments)');if(!o)return;const n=prompt(`Rename "${o}" to:`);if(!n)return;
   const r=await pycall('_kp_rename',curSrc(),o.trim(),n.trim());if(typeof r==='string'&&!r.startsWith('Error')){cm.setValue(r);scripts[cur]=r;persist();devOut().textContent=`Renamed ${o} → ${n} in ${cur}. Undo with ↶ in the editor.`}else devOut().textContent=r},
- profile:()=>confirm(`Profile? This executes "${cur}".`)&&dev('Profile '+cur,`print("This runs your code under cProfile. Tap Stop if it hangs.")\n_kp_profile(${J2(curSrc())})`),
+ profile:()=>!confirm(`Profile? This executes "${cur}".`)?(devOut().textContent='Cancelled.'):dev('Profile '+cur,`print("This runs your code under cProfile. Tap Stop if it hangs.")\n_kp_profile(${J2(curSrc())})`),
  diff:()=>{const a=$('dv-a').value,b=$('dv-b').value;allFiles();dev('Diff',`_kp_diff(${J2(scripts[a]||'')}, ${J2(scripts[b]||'')}, ${J2(a)}, ${J2(b)}, ${$('dv-side').checked?'True':'False'})`)},
  sql:()=>dev('SQL','import sqlite3\nimport r2_getback_sql as m; m.main()'),
  http:()=>dev('HTTP','import r2_forlor_http as m; m.main()'),
  data:()=>dev('Data viewer','import r2_bot2help_data as m; m.main()'),
  projects:()=>dev('Projects','import r2_bot_projects as m; m.main()'),
  bench:()=>dev('Benchmark','import r2_bot3_profile as m; m.main()'),
+ format:async()=>{const src=curSrc();const r=await pycall('_kp_format',src);if(typeof r!=='string'||r.startsWith('Error')){devOut().textContent=String(r);return}
+  if(r===src){devOut().textContent='Already formatted. No changes.';return}await dev('Format preview',`_kp_diff(${J2(src)}, ${J2(r)}, 'before', 'after', False)`);
+  if(confirm('Apply formatting to "'+cur+'"? (Undo with ↶)')){cm.replaceRange(r,{line:0,ch:0},{line:cm.lastLine()});scripts[cur]=r;persist();devOut().append('\nApplied.')}},
+ debug:()=>!confirm(`Debug "${cur}"? This runs your code line by line.`)?(devOut().textContent='Cancelled.'):dev('Debug '+cur,`_kp_debug(${J2(curSrc())})`),
+ metrics:()=>dev('Metrics '+cur,`_kp_metrics(${J2(curSrc())})`),
+ types:()=>dev('Type check '+cur,`_kp_types(${J2(curSrc())})`),
+ snap:()=>{const msg=prompt('Version note (optional)','');if(msg===null)return;dev('Save version',`_kp_snapshot(${J2(cur)}, ${J2(curSrc())}, ${J2(msg)})`)},
+ history:()=>dev('History','import r3_drop_history as m; m.main()'),
+ regex:()=>dev('Regex','import r3_dyno_regex as m; m.main()'),
+ json:()=>dev('JSON','import r3_forlor_json as m; m.main()'),
+ codec:()=>dev('Encode/Hash','import r3_getback_codec as m; m.main()'),
+ templates:()=>dev('Templates','import r3_bot2_snippets as m; m.main()'),
  patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()')};
 document.querySelectorAll('[data-dev]').forEach(b=>b.onclick=()=>{if(running)return toast('Python is busy (tap ⏹ Stop)');DEV[b.dataset.dev]()});
 function devSelects(){const o=Object.keys(scripts).map(n=>`<option>${esc(n)}</option>`).join('');['dv-a','dv-b'].forEach((id,i)=>{const v=$(id).value;$(id).innerHTML=o;$(id).value=v&&v in scripts?v:Object.keys(scripts)[Math.min(i,Object.keys(scripts).length-1)]})}
