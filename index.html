@@ -1,54 +1,137 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Keivon's Python</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="KPython">
-<meta name="theme-color" content="#111111"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
-<style>
-*{box-sizing:border-box}body{margin:0;background:#111;color:#eee;font:16px -apple-system,system-ui,sans-serif;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom)}
-button,select,input{font:inherit;border-radius:10px;border:1px solid #333;background:#222;color:#eee;padding:10px}
-#lock{position:fixed;inset:0;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:9}
-#lock input{width:220px;text-align:center;font-size:24px}
-header{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 0}header h1{font-size:18px;margin:0 auto 0 0}
-#code{width:100%;height:42vh;background:#000;color:#9fef00;font:14px/1.4 Menlo,monospace;border:1px solid #333;border-radius:10px;padding:10px;tab-size:4}
-#run{width:100%;font-size:22px;font-weight:bold;background:#3776ab;margin:8px 0;padding:14px}
-#out{background:#000;border:1px solid #333;border-radius:10px;padding:10px;min-height:20vh;white-space:pre-wrap;font:13px Menlo,monospace}
-.err{color:#ff6b6b}.sys{color:#888}#sel{flex:1;min-width:140px}
-</style></head><body>
-<div id="lock"><h2>🔒 Keivon's Python</h2><div id="lmsg"></div><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button id="lbtn">Unlock</button></div>
-<header><h1>🐍 KPython</h1><button id="lockbtn">🔒</button></header>
-<header><select id="sel"></select><button id="new">New</button><button id="save">Save</button><button id="ren">Rename</button><button id="del">Delete</button></header>
-<textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
-<button id="run" disabled>Loading Python…</button><button id="clr">Clear output</button>
-<div id="out"></div>
+<meta name="theme-color" content="#0d1117"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<link rel="stylesheet" href="app.css">
+</head><body>
+<div id="lock"><div class="logo">🐍</div><h2>Keivon's Python</h2><div id="lmsg"></div><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button id="lbtn" class="pri">Unlock</button></div>
+
+<header id="top"><h1>🐍 KPython</h1><span id="pystat" class="pill">Loading Python…</span><button id="lockbtn" title="Lock">🔒</button></header>
+
+<main>
+<!-- CODE -->
+<section id="v-code" class="view on">
+ <div class="row"><select id="sel"></select><button id="new">＋</button><button id="save">💾</button><button id="snipbtn">📚</button></div>
+ <div id="edwrap"><textarea id="code"></textarea></div>
+ <div id="keybar"></div>
+ <div class="row"><button id="run" class="pri big" disabled>Loading Python…</button><button id="clr">🧹</button></div>
+ <details id="pkgs"><summary>📦 Packages</summary>
+  <div class="row"><input id="pkgname" placeholder="package name (pure-Python or Pyodide)" autocapitalize="off" autocorrect="off"><button id="pkginst">Install</button></div>
+  <div class="row"><button class="qp" data-p="numpy">numpy</button><button class="qp" data-p="pandas">pandas</button><button class="qp" data-p="matplotlib">matplotlib</button></div>
+  <div class="hint">Imports like <code>import numpy</code> also auto-load. Loaded packages are cached for offline use.</div>
+ </details>
+ <div id="out"></div>
+</section>
+
+<!-- TOOLS -->
+<section id="v-tools" class="view">
+ <div class="chips" id="toolchips">
+  <button data-t="t-quote" class="on">🧽 Quote</button><button data-t="t-hours">⏱ Hours</button><button data-t="t-budget">💵 Budget</button><button data-t="t-miles">🚗 Miles</button><button data-t="t-calc">🧮 Calc</button><button data-t="t-gh">🐙 GitHub</button><button data-t="t-more">🛠 More</button>
+ </div>
+ <div id="t-quote" class="tool on card">
+  <h3>Cleaning Quote &amp; Invoice</h3>
+  <label>Client<input id="q-client" placeholder="Business name"></label>
+  <div class="g2"><label>Sq ft<input id="q-sqft" type="number" inputmode="decimal" value="1500"></label><label>Rate $/sq ft<input id="q-rate" type="number" inputmode="decimal" step="0.01" value="0.10"></label></div>
+  <label>Frequency<select id="q-freq"><option value="once">One-time</option><option value="weekly" selected>Weekly</option><option value="biweekly">Every 2 weeks</option><option value="monthly">Monthly</option></select></label>
+  <div id="q-extras" class="checks"></div>
+  <label>Notes<input id="q-notes" placeholder="optional"></label>
+  <button id="q-go" class="pri">Build invoice</button>
+  <pre id="q-out" class="inv"></pre>
+  <div class="row"><button id="q-copy">📋 Copy</button><button id="q-share">📤 Share</button></div>
+ </div>
+ <div id="t-hours" class="tool card">
+  <h3>Shift Hours &amp; Pay</h3>
+  <div class="g2"><label>Date<input id="h-date" type="date"></label><label>Rate $/hr<input id="h-rate" type="number" inputmode="decimal" step="0.25"></label></div>
+  <div class="g3"><label>Start<input id="h-start" type="time" value="22:00"></label><label>End<input id="h-end" type="time" value="06:30"></label><label>Break min<input id="h-brk" type="number" inputmode="numeric" value="30"></label></div>
+  <button id="h-add" class="pri">Add shift</button>
+  <div class="hint">Overtime: hours over 40 in a week (Mon–Sun) pay 1.5×. Overnight shifts are handled.</div>
+  <div id="h-list"></div>
+ </div>
+ <div id="t-budget" class="tool card">
+  <h3>Budget</h3>
+  <div class="g2"><label>Type<select id="b-type"><option value="out">Expense</option><option value="in">Income</option></select></label><label>Amount $<input id="b-amt" type="number" inputmode="decimal" step="0.01"></label></div>
+  <div class="g2"><label>What<input id="b-desc" placeholder="Gas, rent, paycheck…"></label><label>Date<input id="b-date" type="date"></label></div>
+  <button id="b-add" class="pri">Add</button>
+  <div id="b-sum" class="sum"></div><div id="b-list"></div>
+ </div>
+ <div id="t-miles" class="tool card">
+  <h3>Mileage Log</h3>
+  <div class="g2"><label>Date<input id="m-date" type="date"></label><label>Miles<input id="m-mi" type="number" inputmode="decimal" step="0.1"></label></div>
+  <div class="g2"><label>Purpose<input id="m-why" placeholder="Client walkthrough…"></label><label>$/mile<input id="m-rate" type="number" inputmode="decimal" step="0.005"></label></div>
+  <button id="m-add" class="pri">Log trip</button>
+  <div id="m-sum" class="sum"></div><div id="m-list"></div>
+ </div>
+ <div id="t-calc" class="tool card">
+  <h3>Tip &amp; Split</h3>
+  <div class="g3"><label>Bill $<input id="c-bill" type="number" inputmode="decimal" value="50"></label><label>Tip %<input id="c-tip" type="number" inputmode="decimal" value="18"></label><label>People<input id="c-ppl" type="number" inputmode="numeric" value="1"></label></div>
+  <button id="c-tipgo" class="pri">Calculate tip</button><pre id="c-tipout" class="inv"></pre>
+  <h3>Unit Converter</h3>
+  <div class="g2"><label>Value<input id="c-val" type="number" inputmode="decimal" value="1"></label><label>Convert<select id="c-unit"></select></label></div>
+  <button id="c-ugo" class="pri">Convert</button><pre id="c-uout" class="inv"></pre>
+ </div>
+ <div id="t-gh" class="tool card">
+  <h3>GitHub</h3>
+  <div id="gh-status" class="hint">Not logged in. Public repos can be read without logging in.</div>
+  <details id="gh-logbox"><summary>🔑 Log in (for private repos &amp; push)</summary>
+   <p class="hint">Use a <b>fine-grained token</b> limited to specific repos, with <b>Contents: Read and write</b> only and a <b>30-day expiry</b>. Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>.<br>The token stays in memory only. It's never saved, and it's wiped when you lock the app, reload, or log out. Python scripts can't read it.</p>
+   <div class="row"><input id="gh-tok" type="password" autocomplete="off" autocapitalize="off" placeholder="github_pat_…"><button id="gh-login" class="pri">Log in</button></div>
+  </details>
+  <div class="row"><button id="gh-logout" hidden>Log out</button></div>
+  <div class="g2"><label>Repo (owner/repo)<input id="gh-repo" autocapitalize="off" autocorrect="off" placeholder="kcwfire21-blip/kpython"></label><label>Branch<input id="gh-br" autocapitalize="off" placeholder="default"></label></div>
+  <label>Path<input id="gh-path" autocapitalize="off" autocorrect="off" placeholder="folder or file (blank = root)"></label>
+  <div class="row"><button id="gh-open" class="pri">Open</button><button id="gh-up">⬆ Up</button></div>
+  <div id="gh-list"></div>
+  <textarea id="gh-file" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="File contents" style="width:100%;height:200px;font:12px Menlo,monospace;background:#010409;display:none"></textarea>
+  <div id="gh-fileacts" class="row" style="display:none;flex-wrap:wrap"><button id="gh-toed">📝 To editor</button><button id="gh-run">▶ Run…</button><button id="gh-fromed">⬅ Load current script</button><button id="gh-push" class="pri">⬆ Push…</button></div>
+  <div id="gh-msg" class="hint"></div>
+ </div>
+ <div id="t-more" class="tool card">
+  <h3>More tools (from the team)</h3><p class="hint">These open in the Code tab and run there.</p>
+  <div class="row"><button data-snip="Dev tools" class="pri">🛠 Dev tools</button><button data-snip="Terminal">⌨️ Terminal</button></div>
+  <div class="row"><button data-snip="Job application">💼 Job tracker</button><button data-snip="GitHub repo">🐙 GitHub browser</button></div>
+  <div class="row"><button data-snip="Loan">🏦 Loan calc</button><button data-snip="Rent">🏠 Rent check</button></div>
+ </div>
+</section>
+
+<!-- FUN -->
+<section id="v-fun" class="view">
+ <div class="chips" id="funchips">
+  <button data-t="f-snake" class="on">🐍 Snake</button><button data-t="f-2048">🔢 2048</button><button data-t="f-guess">🎯 Guess</button><button data-t="f-8ball">🎱 8-Ball</button><button data-t="f-turtle">🐢 Turtle</button>
+ </div>
+ <div id="f-snake" class="tool on card"><div class="row"><b>Score <span id="sn-score">0</span></b><span class="hint">Best <span id="sn-best">0</span></span><button id="sn-start" class="pri">Start</button></div>
+  <canvas id="sn-c" width="320" height="320"></canvas><div class="dpad"><button data-d="u">▲</button><button data-d="l">◀</button><button data-d="d">▼</button><button data-d="r">▶</button></div><div class="hint">Swipe on the board or use the pad.</div></div>
+ <div id="f-2048" class="tool card"><div class="row"><b>Score <span id="g2-score">0</span></b><span class="hint">Best <span id="g2-best">0</span></span><button id="g2-start" class="pri">New game</button></div>
+  <canvas id="g2-c" width="320" height="320"></canvas><div class="hint">Swipe to slide tiles (arrow keys work too).</div></div>
+ <div id="f-guess" class="tool card"><h3>Number Guess (Python)</h3><p class="hint">Python picks 1–100. Type guesses into the pop-up.</p><button id="gu-go" class="pri">Play</button><pre id="gu-out" class="inv"></pre></div>
+ <div id="f-8ball" class="tool card"><h3>Magic 8-Ball</h3><input id="eb-q" placeholder="Ask a yes/no question…"><div id="eb-ball"><div id="eb-a">8</div></div><button id="eb-go" class="pri">Shake</button></div>
+ <div id="f-turtle" class="tool card"><h3>Turtle Canvas</h3><p class="hint"><code>import turtle</code> works here and in the Code tab.</p>
+  <textarea id="tu-code" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea><div class="row"><button id="tu-go" class="pri">▶ Draw</button><button id="tu-rand">🎲 Random art</button></div><canvas id="tu-c" width="320" height="320"></canvas></div>
+</section>
+
+<!-- FILES -->
+<section id="v-files" class="view">
+ <div class="card"><h3>My Scripts</h3><div id="f-list"></div></div>
+ <div class="card"><h3>📚 Snippets</h3><select id="sn-filter"><option value="">All</option></select><div id="snip-list"></div></div>
+ <div class="card"><h3>Backup</h3><p class="hint">Exports every script and all tool data (not your passcode) to a JSON file.</p>
+  <div class="row"><button id="bk-exp" class="pri">⬇️ Export</button><button id="bk-imp">⬆️ Import</button><input id="bk-file" type="file" accept=".json,application/json" hidden></div>
+  <button id="bk-reset" class="danger">Reset all data…</button><div id="bk-msg" class="hint"></div></div>
+ <div class="card hint">Python runs fully on this phone (Pyodide). Nothing is uploaded. The passcode only blocks casual snooping on this device.</div>
+</section>
+</main>
+
+<nav id="tabs"><button data-v="v-code" class="on"><span>⌨️</span>Code</button><button data-v="v-tools"><span>🧰</span>Tools</button><button data-v="v-fun"><span>🎮</span>Fun</button><button data-v="v-files"><span>📁</span>Files</button></nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-<script>
-const $=id=>document.getElementById(id),LS=localStorage;
-async function sha(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-function setupLock(){const h=LS.getItem('kp_pass');$('lmsg').textContent=h?'Enter passcode':'Create a passcode (4+ characters)';$('lock').style.display='flex';$('pin').value='';$('pin').focus()}
-$('lbtn').onclick=async()=>{const v=$('pin').value,h=LS.getItem('kp_pass');
- if(!h){if(v.length<4)return $('lmsg').textContent='Use at least 4 characters';LS.setItem('kp_pass',await sha(v));$('lock').style.display='none'}
- else if(await sha(v)===h)$('lock').style.display='none';else{$('lmsg').textContent='Wrong passcode';$('pin').value=''}};
-$('pin').onkeydown=e=>{if(e.key==='Enter')$('lbtn').click()};$('lockbtn').onclick=setupLock;
-const STARTERS={"Hello World":'name = input("What\'s your name? ")\nprint(f"Hello, {name}! Python is running on your phone.")',
-"Cleaning Quote":'# Quote + tip calculator for my cleaning business\nsqft = float(input("Square feet: ") or 1500)\nrate = float(input("Rate per sq ft ($): ") or 0.10)\nvisits = int(input("Visits per month: ") or 4)\nper_visit = max(sqft * rate, 75)\nmonthly = per_visit * visits\nprint(f"Per visit: ${per_visit:,.2f}")\nprint(f"Monthly ({visits} visits): ${monthly:,.2f}")\nfor pct in (15, 18, 20):\n    print(f"  {pct}% tip on one visit: ${per_visit*pct/100:,.2f}")',
-"Interview Countdown":'from datetime import datetime, timezone, timedelta\nct = timezone(timedelta(hours=-5))\ndeadline = datetime(2026, 10, 18, 23, 59, tzinfo=ct)\nleft = deadline - datetime.now(ct)\nif left.total_seconds() > 0:\n    h, m = divmod(int(left.total_seconds())//60, 60)\n    print(f"US Foods interview due in {h//24}d {h%24}h {m}m")\nelse:\n    print("Deadline passed")'};
-let scripts=JSON.parse(LS.getItem('kp_scripts')||'null')||STARTERS,cur=LS.getItem('kp_cur')||Object.keys(scripts)[0];
-const persist=()=>{LS.setItem('kp_scripts',JSON.stringify(scripts));LS.setItem('kp_cur',cur)};
-function refresh(){if(!(cur in scripts))cur=Object.keys(scripts)[0]||'';$('sel').innerHTML=Object.keys(scripts).map(n=>`<option>${n.replace(/</g,'&lt;')}</option>`).join('');$('sel').value=cur;$('code').value=scripts[cur]||'';persist()}
-$('sel').onchange=()=>{scripts[cur]=$('code').value;cur=$('sel').value;refresh()};
-$('save').onclick=()=>{if(!cur)return $('new').click();scripts[cur]=$('code').value;persist();log('Saved '+cur,'sys')};
-$('new').onclick=()=>{const n=prompt('Script name?');if(!n||n in scripts)return;scripts[cur]=$('code').value;scripts[n]='print("hi")';cur=n;refresh()};
-$('ren').onclick=()=>{const n=prompt('New name',cur);if(!n||n===cur||n in scripts)return;scripts[n]=$('code').value;delete scripts[cur];cur=n;refresh()};
-$('del').onclick=()=>{if(!cur||!confirm('Delete '+cur+'?'))return;delete scripts[cur];cur='';refresh()};
-$('code').onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();document.execCommand('insertText',false,'    ')}};
-function log(t,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';$('out').appendChild(s);$('out').scrollIntoView({block:'end'})}
-$('clr').onclick=()=>$('out').textContent='';
-let py;(async()=>{try{py=await loadPyodide();py.setStdout({batched:t=>log(t)});py.setStderr({batched:t=>log(t,'err')});
- py.setStdin({stdin:()=>{const v=prompt('input():');return v===null?'':v}});$('run').disabled=false;$('run').textContent='▶ Run';log('Python '+py.version+' ready','sys')}
- catch(e){$('run').textContent='Python failed to load';log(String(e),'err')}})();
-$('run').onclick=async()=>{scripts[cur]=$('code').value;persist();log('— run '+cur+' —','sys');$('run').disabled=true;
- try{const r=await py.runPythonAsync($('code').value);if(r!==undefined&&r!==null)log(String(r))}catch(e){log(String(e.message||e),'err')}$('run').disabled=false};
-refresh();setupLock();
-if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');
-</script></body></html>
+<script src="snippets.js"></script>
+<script src="app.js"></script>
+<script src="games.js"></script>
+<script src="github.js"></script>
+</body></html>
