@@ -240,7 +240,7 @@ def save_output(path, writer, base_dir=None, confirm=None):
     real = safe_path(path, base_dir)
     if os.path.isdir(real):
         raise ValueError("path is a directory")
-    if os.path.exists(real) and not (confirm and confirm("%s exists. Overwrite? (y/n) " % real)):
+    if os.path.exists(real) and not (confirm and confirm("%s exists. Overwrite? (y/N) " % real)):
         return None
     d = os.path.dirname(real)
     if not os.path.isdir(d):
@@ -268,7 +268,7 @@ def save_txt(text, path, base_dir=None, confirm=None):
 def _ask(prompt):
     try:
         return input(prompt)
-    except EOFError:
+    except (EOFError, KeyboardInterrupt):
         return None
 
 
@@ -309,7 +309,7 @@ def _pick(prompt, options, allow_blank=False, allowed=None):
 
 def _yes(msg):
     a = _ask(msg)
-    return bool(a) and a.strip().lower().startswith("y")
+    return bool(a) and a.strip().lower() in ("y", "yes")
 
 
 def main(base_dir=None, force_text=False):
@@ -362,12 +362,12 @@ def main(base_dir=None, force_text=False):
                 print(text)
                 if use_mpl:
                     fig = mpl_figure(kind, rows, x, y, bins)
-                    if _yes("Save PNG? (y/n) "):
+                    if _yes("Save PNG? (y/N) "):
                         p = _ask("PNG path under %s: " % (base_dir or BASE_DIR)) or ""
                         r = save_png(fig, p, base_dir, _yes)
                         print("Saved %s" % r if r else "Not saved.")
                     plt.close(fig)
-                elif _yes("Save text chart as .txt? (y/n) "):
+                elif _yes("Save text chart as .txt? (y/N) "):
                     p = _ask("TXT path under %s: " % (base_dir or BASE_DIR)) or ""
                     r = save_txt(text, p, base_dir, _yes)
                     print("Saved %s" % r if r else "Not saved.")
@@ -473,32 +473,12 @@ def run_selftests(verbose=True):
     return failed == 0
 
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "explain", "gen_tests", "scan_code", "to_fstrings", "extract", "inline", "check"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:

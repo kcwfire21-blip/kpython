@@ -106,7 +106,7 @@ def main():
                 old, new = input("Old name: ").strip(), input("New name: ").strip()
                 src, n = rename(src, old, new)
                 print(f"Renamed {n} occurrence(s).")
-                if path and input(f"Overwrite {path}? type yes: ").strip().lower() == "yes":
+                if path and input(f"Overwrite {path}? (y/N): ").strip().lower() in ("y", "yes"):
                     with open(path, "w") as f: f.write(src)
                     print("Saved.")
             elif c == "4":
@@ -115,6 +115,18 @@ def main():
                 break
         except (ValueError, SyntaxError) as e:
             print("Error:", e)
+
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    src = "def f(a, b=1):\n    return a + b\n\nclass C:\n    def m(self):\n        return f(1)\n"
+    o = outline(src); assert "f" in str(o) and "C" in str(o), o
+    assert "g(a, b=1)" in rename(src, "f", "g") or "def g" in str(rename(src, "f", "g"))
+    assert find_uses(src, "f")
+    complexity(src)
+    try: _kp_safe("../../etc/passwd"); raise AssertionError("escape")
+    except (ValueError, PermissionError): pass
+    print('self-tests passed')
 
 if __name__ == "__main__":
     main()

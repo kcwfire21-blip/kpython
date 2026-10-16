@@ -47,7 +47,7 @@ def run(name, entry="main.py"):
     f = os.path.realpath(f)
     if not f.startswith(os.path.realpath(d) + os.sep): print("Entry must be inside the project"); return
     if not os.path.exists(f): print("No", entry, "in", name); return
-    if os.path.exists(os.path.join(d, MARK)) and input(f"{name} was downloaded from the internet. Run {entry}? Only run code you trust. type yes: ").strip().lower() != "yes":
+    if os.path.exists(os.path.join(d, MARK)) and input(f"{name} was downloaded from the internet. Run {entry}? Only run code you trust. (y/N): ").strip().lower() not in ("y", "yes"):
         print("Not run."); return
     old_cwd, old_path = os.getcwd(), list(sys.path)
     before = set(sys.modules)
@@ -98,7 +98,7 @@ def import_github(repo, ref=""):
         print("GitHub's zip download redirects to codeload.github.com, which browsers block (CORS). Use the GitHub panel in Tools to open files instead.")
         return
     dest = path(name)
-    if os.path.exists(dest) and input(f"{name} exists. Overwrite? (y/n): ").lower() != "y": return
+    if os.path.exists(dest) and input(f"{name} exists. Overwrite? (y/N): ").strip().lower() not in ("y", "yes"): return
     shutil.rmtree(dest, ignore_errors=True)
     with zipfile.ZipFile(io.BytesIO(data)) as z: n = _safe_extract(z, dest, strip_top=True)
     open(os.path.join(dest, MARK), "w").write(url)
@@ -109,24 +109,45 @@ def main():
     menu = """\n=== Projects ===
  1 list   2 new   3 tree   4 run main.py   5 zip   6 unzip   7 import GitHub repo   8 delete   q quit"""
     while True:
-        print(menu); c = input("> ").strip()
+        print(menu)
+        try: c = input("> ").strip().lower()
+        except (KeyboardInterrupt, EOFError): break
         try:
-            if c == "q": break
+            if c in ("q", "quit"): break
             elif c == "1": list_projects()
             elif c == "2": new(input("Project name: ").strip())
-            elif c and c in "3458":
-                ps = list_projects(); s = input("Project # or name: ").strip()
-                p = ps[int(s) - 1] if s.isdigit() else s
+            elif c in ("3", "4", "5", "8"):  # KPython: exact match (was a substring test)
+                ps = list_projects(); s = input("Project # or name (blank = back): ").strip()
+                if not s: continue
+                if s.isdigit():
+                    if not 1 <= int(s) <= len(ps): print(f"No project #{s}. Pick 1-{len(ps)}."); continue
+                    p = ps[int(s) - 1]
+                elif s in ps: p = s
+                else: print("No project called", s); continue
                 if c == "3": tree(p)
                 elif c == "4": run(p, input("Entry file [main.py]: ").strip() or "main.py")
                 elif c == "5": zip_project(p)
-                elif c == "8" and input(f"Delete {p}? type yes: ") == "yes":
+                elif c == "8" and input(f"Delete {p}? (y/N): ").strip().lower() in ("y", "yes"):
                     d = os.path.realpath(path(p))
                     if not d.startswith(os.path.realpath(ROOT) + os.sep): raise ValueError("refused: outside projects folder")
                     shutil.rmtree(d); print("Deleted.")
             elif c == "6": unzip(input("Zip file path: ").strip(), input("Project name (enter = zip name): ").strip() or None)
             elif c == "7": import_github(input("owner/repo or URL: "), input("Branch/tag (enter = default): ").strip())
+            elif c: print("Pick 1-8 or q.")
+            elif c: print("Pick 1-8 or q.")
+            elif c: print("Pick 1-8 or q.")
         except Exception as e: print("Error:", e)
+
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    for name in ("../x", "/etc", "a/b"):
+        assert os.path.dirname(path(name)) == ROOT, path(name)  # names are reduced to a single folder under ROOT
+    for bad in ("", "..", "."):
+        try: path(bad); raise AssertionError("accepted " + repr(bad))
+        except ValueError: pass
+    assert isinstance(list_projects(), list)
+    print('self-tests passed')
 
 if __name__ == "__main__":
     main()

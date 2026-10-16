@@ -198,7 +198,7 @@ def choose_source(label, full, scripts):
         return read_text(confine(input("File path (inside ~): ")))
     if c == "s":
         if scripts is None:
-            raise ValueError("no saved-scripts bridge here (only inside the KPython v7 app)")
+            raise ValueError("no saved-scripts bridge here (only inside the KPython app)")
         n = input("Saved script name: ").strip()
         if n not in scripts:
             raise ValueError("no saved script with that name")
@@ -214,7 +214,9 @@ def resolve(parts):
         print(f"\n--- conflict {k}/{len(cs)} ---")
         print(render([cf]), end="")
         while True:
-            c = input("Keep o=ours t=theirs b=both base=base m=markers: ").strip().lower()
+            c = input("Keep o=ours t=theirs b=both base=base m=markers (q/blank = cancel merge): ").strip().lower()
+            if c in ("", "q", "quit"):
+                return None
             if c in ("o", "t", "b", "base", "m"):
                 choices.append(c)
                 break
@@ -229,7 +231,7 @@ async def amain():
     except Exception as e:
         scripts = None
         print("Saved-scripts bridge error:", e)
-    print("Saved scripts: " + ("v7 bridge found. Merging into a saved script asks you to approve the change in the app." if scripts is not None
+    print("Saved scripts: " + ("connected to the app. Merging into a saved script asks you to approve the change in the app." if scripts is not None
           else "no bridge here, so only files under ~ can be merged."))
     while True:
         c = input("\n1 Merge into a file  2 Merge into a saved script  t Self-tests  q Quit: ").strip().lower()
@@ -245,7 +247,7 @@ async def amain():
             script = None
             if c == "2":
                 if scripts is None:
-                    print("No saved-scripts bridge (needs the KPython v7 app).")
+                    print("No saved-scripts bridge (needs the KPython app).")
                     continue
                 script = input("Saved script name: ").strip()
                 if script not in scripts:
@@ -264,17 +266,23 @@ async def amain():
                 continue
             for v in vs[-15:]:
                 print(f"  v{v['id']}  {v['ts']}  {v.get('msg', '')}")
-            b = version_text(full, int(input("Base version number: ").strip().lstrip("v") or "x"))
+            s = input("Base version number (blank = back): ").strip().lstrip("vV")
+            if not s: continue
+            if not s.isdigit(): print("Enter a version number like 3 or v3."); continue
+            b = version_text(full, int(s))
             o = choose_source("OURS", full, scripts)
             t = choose_source("THEIRS", full, scripts)
             parts = merge3(b.splitlines(True), o.splitlines(True), t.splitlines(True))
             n = len(conflicts(parts))
             print(f"\nAuto-merged. {n} conflict(s).")
-            result = render(parts, resolve(parts) if n else None)
+            ch = resolve(parts) if n else None
+            if n and ch is None:
+                print("Merge cancelled, nothing written."); continue
+            result = render(parts, ch)
             cur = read_text(full)
             d = "".join(difflib.unified_diff(cur.splitlines(True), result.splitlines(True), f"{rel} (current)", f"{rel} (merged)"))
             print(d or "(merged result is identical to the current file)")
-            if not d or input("Type y to write the merged result: ").strip().lower() != "y":
+            if not d or input("Write the merged result? (y/N): ").strip().lower() not in ("y", "yes"):
                 print("Nothing written.")
                 continue
             if len(result.encode()) > MAX_BYTES:
@@ -417,32 +425,12 @@ def run_self_tests():
     return fail == 0
 
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "split_cells", "merge3", "parse_requirements", "scan_setup", "parse_cron", "parse_any", "analyze_lines"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT", "HOME")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()

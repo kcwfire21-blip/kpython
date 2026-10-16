@@ -189,7 +189,7 @@ class Quit(Exception):
 def ask(prompt):
     try:
         return input(prompt)
-    except EOFError:
+    except (EOFError, KeyboardInterrupt):
         raise Quit()
 
 def read_paste():
@@ -198,7 +198,7 @@ def read_paste():
     while True:
         try:
             l = input()
-        except EOFError:
+        except (EOFError, KeyboardInterrupt):
             break
         if l.strip() == "END":
             break
@@ -226,7 +226,7 @@ def output(text):
     dest = ask("(p)rint or (s)ave to file? ").strip().lower()
     if dest.startswith("s"):
         path = resolve_path(ask("Save as: "))
-        if os.path.exists(path) and ask(f"{path} exists. Overwrite? type yes: ").strip().lower() != "yes":
+        if os.path.exists(path) and (ask(f"{path} exists. Overwrite? (y/N): ") or "").strip().lower() not in ("y", "yes"):
             return print("Not saved.")
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
@@ -319,6 +319,18 @@ def main():
         except Exception as e:
             print("Error:", e)
     print("Bye.")
+
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    rows = parse_csv("name,qty\napple,3\npear,5\n")
+    assert len(rows) == 2 and columns(rows) == ["name", "qty"], rows
+    assert to_number("5") == 5 and infer_type(["1", "2"]) in ("int", "number", "float", "integer")
+    assert len(filter_rows(rows, "qty", ">", "4")) == 1
+    assert parse_json('[{"a": 1}]')[0]["a"] == 1
+    try: resolve_path("../../etc/passwd"); raise AssertionError("escape")
+    except (ValueError, PermissionError): pass
+    print('self-tests passed')
 
 if __name__ == "__main__":
     main()

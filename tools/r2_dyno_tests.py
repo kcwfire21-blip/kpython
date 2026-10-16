@@ -70,5 +70,17 @@ def main():
             lines.append(line)
         run("\n".join(lines))
 
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    import contextlib, io
+    code = "import unittest\ndef add(a, b):\n    return a + b\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(2, 2), 4)\n"
+    with contextlib.redirect_stdout(io.StringIO()) as o, contextlib.redirect_stderr(io.StringIO()) as e:
+        run(code)
+    assert "OK" in o.getvalue() + e.getvalue() or "passed" in (o.getvalue() + e.getvalue()).lower(), o.getvalue() + e.getvalue()
+    try: safe_path("../../etc/passwd"); raise AssertionError("escape")
+    except (ValueError, PermissionError): pass
+    print('self-tests passed')
+
 if __name__ == "__main__":
     main()

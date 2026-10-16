@@ -78,5 +78,16 @@ def main():
         except Exception as e:
             print("Cancelled." if str(e) == "cancelled" else f"Error: {type(e).__name__}: {e}")
 
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    r = bench("sum(range(100))", number=10, repeat=2)
+    assert r is not None
+    assert fmt(0.5) and fmt(1e-6)
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()):
+        profile_code("sum(range(1000))", top=3)
+    print('self-tests passed')
+
 if __name__ == "__main__":
     main()

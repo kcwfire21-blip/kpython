@@ -142,7 +142,7 @@ def main():
                 while (l := input()) != ".":
                     lines.append(l)
                     if sum(map(len, lines)) > 500_000: print("Too big (max 500 KB)."); lines = []; break
-            except EOFError: pass
+            except (EOFError, KeyboardInterrupt): pass
             report("\n".join(lines))
         elif c == "2":
             p = input("File path: ").strip()
@@ -150,32 +150,12 @@ def main():
             except OSError as e: print("Error:", e)
         elif c == "3": _self_test()
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     if "--test" in sys.argv: _self_test()

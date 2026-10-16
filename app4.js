@@ -49,7 +49,7 @@ function rlog(t,c){const s=document.createElement('span');if(c)s.className=c;s.t
 async function replSend(){const src=$('r-in').value;if(running)return toast('Python is busy');const lines=src.split('\n');$('r-in').value='';
  const TOKRE=/(eyJ[\w-]+\.[\w-]+\.[\w-]*|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-[\w-]{16,}|AKIA[0-9A-Z]{16}|xox[abprs]-[\w-]{10,}|(authorization|password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+)/i;
  if(src.trim()&&!TOKRE.test(src)){RH.push(src);if(RH.length>200)RH.shift();S('kp_rhist',RH)}rhi=RH.length;
- for(const ln of lines){rlog(($('r-ps').textContent)+' '+ln,'echo');const r=await job({cmd:'repl',line:ln,files:allFiles()},{target:$('r-out')});
+ for(const ln of lines){rlog(($('r-ps').textContent)+' '+ln,'echo');kpJobNext='The console (REPL)';const r=await job({cmd:'repl',line:ln,files:allFiles()},{target:$('r-out')});
   $('r-ps').textContent=r.more?'...':'>>>';if(!r.ok)break}
  if(lines.length>1&&$('r-ps').textContent==='...'){const r=await job({cmd:'repl',line:'',files:allFiles()},{target:$('r-out')});$('r-ps').textContent=r.more?'...':'>>>'}
  $('r-out').scrollTop=1e9;$('r-in').focus()}
@@ -80,7 +80,9 @@ $('d-q').onkeydown=e=>{if(e.key==='Enter')$('d-go').click()};
 document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.textContent;$('d-go').click()});
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
-async function dev(label,code){kpJobName='The Dev tool "'+label+'"';devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
+// v9: Cancel on an input() prompt ends any tool cleanly ("Cancelled."), and a tool can never leave a tracer (debugger) running.
+function devWrap(code){return 'import sys as _kp_sys\ntry:\n'+code.split('\n').map(l=>'    '+l).join('\n')+'\nexcept (KeyboardInterrupt, EOFError) as _kp_e:\n    if isinstance(_kp_e, KeyboardInterrupt) and "input cancelled" not in str(_kp_e): raise\n    print("\\n⏹ Cancelled.")\nfinally:\n    _kp_sys.settrace(None)\n'}
+async function dev(label,code){kpJobNext='The Dev tool "'+label+'"';devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+devWrap(code),files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
 const DEV={
@@ -95,7 +97,7 @@ const DEV={
  http:()=>dev('HTTP','import r2_forlor_http as m; m.main()'),
  data:()=>dev('Data viewer','import r2_bot2help_data as m; m.main()'),
  projects:()=>dev('Projects','import r2_bot_projects as m; m.main()'),
- bench:()=>dev('Benchmark','import r2_bot3_profile as m; m.main()'),
+ bench:()=>dev('Benchmark','import r7_bot_benchq as m; m.main()'),
  format:async()=>{const src=curSrc();const r=await pycall('_kp_format',src);if(typeof r!=='string'||r.startsWith('Error')){devOut().textContent=String(r);return}
   if(r===src){devOut().textContent='Already formatted. No changes.';return}await dev('Format preview',`_kp_diff(${J2(src)}, ${J2(r)}, 'before', 'after', False)`);
   if(confirm('Apply formatting to "'+cur+'"? (Undo with ↶)')){cm.replaceRange(r,{line:0,ch:0},{line:cm.lastLine()});scripts[cur]=r;persist();devOut().append('\nApplied.')}},
@@ -123,6 +125,8 @@ const DEV={
  packages:()=>dev('Packages','import r4_drop_packages as m\nawait m.amain()'),
  patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()'),
  help:()=>dev('❓ Help guide','import r6_eight_help as m\nm.main()'),
+ tour:()=>dev('🧭 Getting-started tour','import r7_bot2_tour as m\nm.main()'),
+ selftestall:()=>dev('🧪 Self-test all tools','import r7_dyno_selftest_all as m\nm.main()'),
  cells:()=>dev('🧩 Cell runner (# %%)','import r6_dyno_cells as m\nm.main()'),
  time:()=>dev('🕒 Time & cron','import tzdata  # loads time-zone data in the browser\nimport r6_forlor_time as m\nm.main()'),
  audit:()=>dev('🛡 Dependency audit','import r6_getback_audit as m\nm.main()'),
@@ -169,6 +173,7 @@ $('f-new').onclick=()=>{const n=prompt('New script name?');if(n){newScript(n.tri
 async function offStatus(){const el=$('offstat');if(!('serviceWorker'in navigator)){el.textContent='⚠️ No offline';return}
  const reg=await navigator.serviceWorker.ready.catch(()=>null);const sw=navigator.serviceWorker.controller||reg?.active;if(!sw){el.textContent='…';return setTimeout(offStatus,3000)}
  const ch=new MessageChannel();const r=await new Promise(res=>{ch.port1.onmessage=e=>res(e.data);sw.postMessage({kpStatus:1},[ch.port2]);setTimeout(()=>res(null),4000)});
+ if(r&&r.ok&&r.ver!==KP_APPV&&!window.kpUpdatePending&&(offStatus.n=(offStatus.n||0)+1)<10){el.textContent='⏳ Updating…';el.classList.remove('ok');el.title='Finishing the update to '+KP_APPV;return setTimeout(offStatus,3000)}
  if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=(r.ver===KP_APPV?'':'⚠️ page '+KP_APPV+' vs ')+'cache '+r.ver+': everything is cached'+(r.ver===KP_APPV?'':' (reload to finish updating)')}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
 offStatus();
 
@@ -203,6 +208,23 @@ renderSites();
 
 /* v8: undo the last saved-script change made through the Python bridge (page-side snapshots, last 20) */
 $('bk-undo').onclick=()=>{let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]')}catch(e){}if(!Array.isArray(s)||!s.length){toast2('No Python changes to undo');return}
- const last=s[s.length-1];if(!last||typeof last.name!=='string'||typeof last.text!=='string'){s.pop();LS.setItem('kp_snaps',JSON.stringify(s));return}
- if(!confirm(`Restore "${last.name}" to how it was before the Python change at ${last.ts.slice(0,16).replace('T',' ')} UTC?`))return;
- s.pop();LS.setItem('kp_snaps',JSON.stringify(s));if(['__proto__','constructor','prototype'].includes(last.name))return;scripts[last.name]=last.text;persist();refresh();if(last.name===cur)cm.setValue(last.text);toast2('Restored "'+last.name+'"')};
+ const last=s[s.length-1];const BAD=['__proto__','constructor','prototype'];
+ if(!last||typeof last.name!=='string'||typeof last.text!=='string'||typeof last.ts!=='string'||BAD.includes(last.name)){s.pop();LS.setItem('kp_snaps',JSON.stringify(s));toast2('Skipped a damaged undo entry');return}
+ if(last.name===cur){clearTimeout(dirtyT);scripts[cur]=cm.getValue();persist()}
+ const exists=Object.hasOwn(scripts,last.name);const changed=exists&&typeof last.after==='string'&&scripts[last.name]!==last.after;
+ let q=`Restore "${last.name}" to how it was before the Python change at ${last.ts.slice(0,16).replace('T',' ')} UTC?`;
+ if(!exists)q=`"${last.name}" no longer exists (deleted or renamed).\nRecreate it with the text from before the Python change at ${last.ts.slice(0,16).replace('T',' ')} UTC?`;
+ else if(changed)q+=`\n\n⚠️ You have edited "${last.name}" since then. Your newer edits will be replaced (a copy of them is kept, so Undo again brings them back).`;
+ if(!confirm(q))return;
+ s.pop();if(exists&&changed)s.push({name:last.name,text:scripts[last.name],after:last.text,ts:new Date().toISOString()});
+ try{LS.setItem('kp_snaps',JSON.stringify(s))}catch(e){toast2('Not enough storage for undo');return}
+ scripts[last.name]=last.text;persist();refresh();if(last.name===cur)cm.setValue(last.text);toast2('Restored "'+last.name+'"')};
+// v9: offer the getting-started tour once, on first launch (after unlock and once Python is ready)
+(async()=>{try{if(LS.getItem('kp_toured'))return;for(let i=0;i<600&&!$('pystat').classList.contains('ok');i++)await new Promise(r=>setTimeout(r,500));
+ for(let i=0;i<600&&$('lock')&&getComputedStyle($('lock')).display!=='none';i++)await new Promise(r=>setTimeout(r,500));
+ if(LS.getItem('kp_toured')||running)return;LS.setItem('kp_toured','1');
+ if(confirm('Welcome to KPython! Take the 1-minute getting-started tour?\n\n(You can open it any time from Dev › 🧭 Getting-started tour.)')){showView('v-dev');DEV.tour()}}catch(e){console.error(e)}})();
+// v9 perf: the games and the GitHub panel aren't needed for the first paint; load them once the page is idle
+(()=>{const load=()=>['games.js','github.js'].forEach(f=>{const s=document.createElement('script');s.src=f;document.body.appendChild(s)});
+ const go=()=>window.requestIdleCallback?requestIdleCallback(load,{timeout:2000}):setTimeout(load,300);
+ if(document.readyState==='complete')go();else window.addEventListener('load',go)})();

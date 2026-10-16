@@ -4,7 +4,7 @@
 <title>Keivon's Python</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="KPython">
-<meta name="theme-color" content="#0d1117"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0d1117"><link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" integrity="sha384-ccdJwIIg/K0Ab6aXF4MPACh7ckk61tvQFTrfkhXZEALgAETURNZIAuQLcS/aPbrM" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css" integrity="sha384-TU/qRI67N04B589luYdn1ZMRIGgJic3GB1WsvLJTRh92VO26vpxI4dCKiDtsR4fw" crossorigin="anonymous">
@@ -49,7 +49,7 @@
  <div class="card"><h3>Current script</h3><p class="hint">Works on the script open in the Code tab.</p>
   <div class="g2"><button data-dev="lint" class="pri">🧹 Lint</button><button data-dev="tests" class="pri">✅ Run tests</button><button data-dev="outline">🗂 Outline</button><button data-dev="rename">✏️ Rename…</button><button data-dev="profile">⏱ Profile</button><button data-dev="bench">📊 Benchmark</button><button data-dev="format" class="pri">✨ Format</button><button data-dev="debug" class="pri">🐞 Debug</button><button data-dev="metrics">📏 Metrics</button><button data-dev="types">🔤 Type check</button><button data-dev="snap">🕘 Save version</button><button data-dev="history">📜 History</button><button data-dev="docgen" class="pri">📝 Docstrings</button><button data-dev="cover" class="pri">🧪 Coverage</button><button data-dev="memory">🧠 Memory</button><button data-dev="secrets">🔑 Secret scan</button><button data-dev="imports">🕸 Import map</button><button data-dev="markdown">📄 Markdown preview</button></div><iframe id="dv-md" sandbox="" hidden style="width:100%;height:300px;border:1px solid #30363d;border-radius:12px;background:#0d1117;margin-top:8px"></iframe></div>
  <div class="card"><h3>Diff two scripts</h3><div class="g2"><select id="dv-a"></select><select id="dv-b"></select></div><div class="row"><label class="ck"><input type="checkbox" id="dv-side"> Side by side</label><button data-dev="diff" class="pri">Compare</button><button data-dev="patch">Patch…</button></div></div>
- <div class="card"><h3>Round 5 tools</h3><div class="g2"><button data-dev="help">❓ Help guide</button><button data-dev="cells">🧩 Cell runner (# %%)</button><button data-dev="time">🕒 Time & cron</button><button data-dev="audit">🛡 Dependency audit</button><button data-dev="merge">🔀 3-way merge</button><button data-dev="bigo">📈 Big-O estimator</button><button data-dev="cheats">📝 Cheat sheets</button><button data-dev="logs">📜 Log analyzer</button><button data-dev="board">✅ Task board</button><button data-dev="testgen">🧪 Test generator</button><button data-dev="apis">📮 API collections</button><button data-dev="pwgen">🔑 Passwords</button><button data-dev="search">🔍 Project search</button><button data-dev="savedrepl">✏️ Replace in saved scripts</button><button data-dev="compare">⏱ Compare speed</button><button data-dev="explain">📖 Explain code</button><button data-dev="chart">📊 Charts</button><button data-dev="refactor">🛠 Refactor</button></div></div>
+ <div class="card"><h3>Round 5 tools</h3><div class="g2"><button data-dev="help">❓ Help guide</button><button data-dev="tour">🧭 Getting-started tour</button><button data-dev="selftestall">🧪 Self-test all tools</button><button data-dev="cells">🧩 Cell runner (# %%)</button><button data-dev="time">🕒 Time & cron</button><button data-dev="audit">🛡 Dependency audit</button><button data-dev="merge">🔀 3-way merge</button><button data-dev="bigo">📈 Big-O estimator</button><button data-dev="cheats">📝 Cheat sheets</button><button data-dev="logs">📜 Log analyzer</button><button data-dev="board">✅ Task board</button><button data-dev="testgen">🧪 Test generator</button><button data-dev="apis">📮 API collections</button><button data-dev="pwgen">🔑 Passwords</button><button data-dev="search">🔍 Project search</button><button data-dev="savedrepl">✏️ Replace in saved scripts</button><button data-dev="compare">⏱ Compare speed</button><button data-dev="explain">📖 Explain code</button><button data-dev="chart">📊 Charts</button><button data-dev="refactor">🛠 Refactor</button></div></div>
  <div class="card"><h3>Tools</h3><div class="g2"><button data-dev="sql">🗄 SQL</button><button data-dev="http">🌐 HTTP</button><button data-dev="data">📋 Data viewer</button><button data-dev="projects">📦 Projects</button><button data-dev="regex">🔎 Regex</button><button data-dev="json">🧾 JSON</button><button data-dev="codec">🔐 Encode/Hash</button><button data-dev="templates">🧩 Templates</button><button data-dev="convert">🔁 Convert config</button><button data-dev="katas">🥋 Katas</button><button data-dev="packages">📦 Packages</button></div>
   <p class="hint">By the team: lint Eight · tests Dyno · HTTP Forlor · diff Drop · SQL Get back · profile bot3 · data bot2help · outline bot2 · projects bot · format Eight · regex Dyno · JSON Forlor · encode/hash Get back · history Drop · debugger bot3 · templates bot2 · metrics bot2help · type check bot · markdown Eight · coverage Dyno · convert Forlor · secret scan Get back · packages Drop · memory bot3 · katas bot2 · import map bot2help · docstrings bot. Files stay under /home/pyodide (in-memory, reset when Python restarts).</p></div>
  <div class="row"><button id="dv-clr">🧹 Clear</button></div>
@@ -156,24 +156,23 @@
  <div class="card"><h3>📚 Snippets</h3><select id="sn-filter"><option value="">All</option></select><div id="snip-list"></div></div>
  <div class="card"><h3>Backup</h3><p class="hint">Exports every script, all tool data and History versions (not your passcode) to a JSON file.</p>
   <div class="row"><button id="bk-exp" class="pri">⬇️ Export</button><button id="bk-imp">⬆️ Import</button><input id="bk-file" type="file" accept=".json,application/json" hidden></div>
-  <button id="bk-undo">↶ Undo last Python change</button><button id="bk-reset" class="danger">Reset all data…</button><div id="bk-msg" class="hint"></div></div>
+  <button id="bk-undo">↶ Undo (last Python change or deleted script)</button><button id="bk-reset" class="danger">Reset all data…</button><div id="bk-msg" class="hint"></div></div>
  <div class="card hint">Python runs fully on this phone (Pyodide). Nothing is uploaded. The passcode only hides the screen; it does <b>not</b> encrypt anything.<br>⚠️ <b>Don't paste passwords or tokens into scripts.</b> Scripts, console history and History versions are stored as plain text on this phone. Check with <a href="#" id="go-scan">Dev ▸ 🔑 Secret scan</a>.</div>
 </section>
 </main>
 
 <nav id="tabs"><button data-v="v-code" class="on"><span>⌨️</span>Code</button><button data-v="v-repl"><span>&gt;_</span>REPL</button><button data-v="v-dev"><span>🛠</span>Dev</button><button data-v="v-tools"><span>🧰</span>Tools</button><button data-v="v-fun"><span>🎮</span>Fun</button><button data-v="v-files"><span>📁</span>Files</button></nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" integrity="sha384-ZYmwuq4n2gOcNxMSiJ6jyTj+BbIrilr7p6dlq6q5nmSWKmsH9UU4K1qqjycMkfmR" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js" integrity="sha384-Xy+2exU6lBoT4OpUOtnQb+cUpn+nlJQEHvRobWVtwz6wIsw4oNoO7xyd/l8rYgMy" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js" integrity="sha384-LjCI3E8qhhxXZvu7+FCvqx9eZYSowFvuJ7z54KsgI/BDPGKEuysqCg/vYiKHvC4Y" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js" integrity="sha384-69mJoUoPPF/C7qPs6lLjvXvrt6w225+rmxWqGO3a1glVjITdnnwPQOtG9FRTd2Ni" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js" integrity="sha384-ILkploZWukdp1VMmzMnE+32H0mgy2e+w29evc4grALGOqIRGBgbBGrwkX7a6zK7y" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js" integrity="sha384-qCnKPgNYgVO8RO19jShRRAfU75+KVnN1cQy+8CPX/TTwJsUEJ/EpnwKx2UOyLx8c" crossorigin="anonymous"></script>
-<script src="sites.js"></script>
-<script src="snippets.js"></script>
-<script src="app.js"></script>
-<script src="games.js"></script>
-<script src="github.js"></script>
-<script src="app4.js"></script>
-<script src="palette.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" integrity="sha384-ZYmwuq4n2gOcNxMSiJ6jyTj+BbIrilr7p6dlq6q5nmSWKmsH9UU4K1qqjycMkfmR" crossorigin="anonymous" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js" integrity="sha384-Xy+2exU6lBoT4OpUOtnQb+cUpn+nlJQEHvRobWVtwz6wIsw4oNoO7xyd/l8rYgMy" crossorigin="anonymous" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js" integrity="sha384-LjCI3E8qhhxXZvu7+FCvqx9eZYSowFvuJ7z54KsgI/BDPGKEuysqCg/vYiKHvC4Y" crossorigin="anonymous" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js" integrity="sha384-69mJoUoPPF/C7qPs6lLjvXvrt6w225+rmxWqGO3a1glVjITdnnwPQOtG9FRTd2Ni" crossorigin="anonymous" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js" integrity="sha384-ILkploZWukdp1VMmzMnE+32H0mgy2e+w29evc4grALGOqIRGBgbBGrwkX7a6zK7y" crossorigin="anonymous" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js" integrity="sha384-qCnKPgNYgVO8RO19jShRRAfU75+KVnN1cQy+8CPX/TTwJsUEJ/EpnwKx2UOyLx8c" crossorigin="anonymous" defer></script>
+<script src="sites.js" defer></script>
+<script src="snippets.js" defer></script>
+<script src="app.js" defer></script>
+<script src="app4.js" defer></script>
+<script src="palette.js" defer></script>
+<script src="a11y.js" defer></script>
 </body></html>

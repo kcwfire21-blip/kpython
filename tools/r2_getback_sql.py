@@ -51,7 +51,7 @@ def export_csv(con, t, fname):
     if not con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (t,)).fetchone():
         return print("No such table.")
     p = safe_path(fname or t, ".csv")
-    if os.path.exists(p) and input(f"{p} exists. Overwrite? type yes: ").strip().lower() != "yes": return print("Export cancelled.")
+    if os.path.exists(p) and input(f"{p} exists. Overwrite? (y/N): ").strip().lower() not in ("y", "yes"): return print("Export cancelled.")
     cur = con.execute(f'SELECT * FROM "{t}"')
     with open(p, "w", newline="") as f:
         wr = csv.writer(f); wr.writerow([d[0] for d in cur.description]); wr.writerows(cur)
@@ -88,7 +88,7 @@ def main():
     buf = ""
     while True:
         try: line = input("...> " if buf else "sql> ")
-        except EOFError: break
+        except (EOFError, KeyboardInterrupt): break
         s = line.strip()
         if not buf and s.startswith("."):
             p = s.split(); c = p[0].lower(); a = p[1:]
@@ -116,6 +116,21 @@ def main():
             except Exception as e: print("Error:", e)
             buf = ""
     con.close(); print("Bye.")
+
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    import sqlite3
+    con = sqlite3.connect(":memory:")
+    con.execute("create table t(a, b)"); con.execute("insert into t values (1, 'x')")
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()) as o:
+        tables(con); schema(con, "t")
+    assert "t" in o.getvalue(), o.getvalue()
+    for bad in ("../x", "/etc/passwd"):
+        try: safe_path(bad, ".db"); raise AssertionError("escape")
+        except (ValueError, PermissionError): pass
+    print('self-tests passed')
 
 if __name__ == "__main__":
     main()

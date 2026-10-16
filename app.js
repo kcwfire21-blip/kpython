@@ -32,7 +32,7 @@ const STARTERS={"Hello World":'name = input("What\'s your name? ")\nprint(f"Hell
 let scripts=J('kp_scripts',null)||{...STARTERS},cur=LS.getItem('kp_cur')||Object.keys(scripts)[0];
 const persist=()=>{LS.setItem('kp_scripts',JSON.stringify(scripts));LS.setItem('kp_cur',cur)};
 
-const cm=CodeMirror.fromTextArea($('code'),{mode:'python',theme:'dracula',lineNumbers:true,indentUnit:4,tabSize:4,smartIndent:true,matchBrackets:true,autoCloseBrackets:true,lineWrapping:false,inputStyle:'contenteditable',
+const cm=CodeMirror.fromTextArea($('code'),{historyEventDelay:400,mode:'python',theme:'dracula',lineNumbers:true,indentUnit:4,tabSize:4,smartIndent:true,matchBrackets:true,autoCloseBrackets:true,lineWrapping:false,inputStyle:'contenteditable',
  extraKeys:{Tab:c=>c.somethingSelected()?c.indentSelection('add'):c.replaceSelection('    '),'Shift-Tab':c=>c.indentSelection('subtract'),'Ctrl-Enter':()=>run(),'Cmd-Enter':()=>run()}});
 let dirtyT;const setDirty=d=>{$('save').textContent=d?'💾•':'💾';$('save').title=d?'Unsaved changes (autosaves in a moment)':'Saved'};
 cm.on('change',(c,ch)=>{if(ch.origin==='setValue')return;setDirty(true);clearTimeout(dirtyT);dirtyT=setTimeout(()=>{if(cur){scripts[cur]=cm.getValue();persist();setDirty(false)}},600)});
@@ -69,22 +69,33 @@ window.kpT=(op,...a)=>{if(!tuCanvas){tuCanvas=document.createElement('canvas');t
 function clearT(c){const x=c.getContext('2d');x.fillStyle=c.dataset.bg||'#010409';x.fillRect(0,0,c.width,c.height)}
 
 /* ---------- Python (v4: runs in a Web Worker so Stop works) ---------- */
-const TOOLS=['r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py','r4_getback_secrets.py','r4_drop_packages.py','r4_bot3_memory.py','r4_bot2_katas.py','r4_bot2help_imports.py','r4_bot_docgen.py','r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py','r5_bot2_explain.py','r5_bot2help_chart.py','r5_bot3_timeit.py','r5_bot_refactor.py','r5_drop_search.py','r5_dyno_testgen.py','r5_eight_todo.py','r5_forlor_apiclient.py','r5_getback_pwgen.py','r6_eight_help.py','r6_dyno_cells.py','r6_forlor_time.py','r6_getback_audit.py','r6_drop_merge.py','r6_bot3_bigo.py','r6_bot2_cheats.py','r6_bot2help_logs.py'];
+const TOOLS=['kp_common.py','r7_bot2_tour.py','r7_dyno_selftest_all.py','r7_bot_benchq.py','r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py','r4_getback_secrets.py','r4_drop_packages.py','r4_bot3_memory.py','r4_bot2_katas.py','r4_bot2help_imports.py','r4_bot_docgen.py','r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py','r5_bot2_explain.py','r5_bot2help_chart.py','r5_bot3_timeit.py','r5_bot_refactor.py','r5_drop_search.py','r5_dyno_testgen.py','r5_eight_todo.py','r5_forlor_apiclient.py','r5_getback_pwgen.py','r6_eight_help.py','r6_dyno_cells.py','r6_forlor_time.py','r6_getback_audit.py','r6_drop_merge.py','r6_bot3_bigo.py','r6_bot2_cheats.py','r6_bot2help_logs.py'];
 const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
 let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
 function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
 // reinstall list: keep valid entries; drop the self-test's 'demo' package if an old version leaked it
 const cleanPkgs=l=>Array.isArray(l)?l.filter(s=>typeof s==='string'&&/^[\w.\-\[\]=<>]{1,120}$/.test(s)&&!/^demo(?:[=<>\[]|$)/i.test(s)):[];
-/* ---- v8 saved-scripts bridge (page side). Python can only ASK; every answer comes from Keivon, and the reply is always sent. ---- */
-const BR={job:0,read:null,denies:0,busy:false};let kpJobName='a script';
-const SNAPMAX=20;
-function snapshot(name,text){let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]');if(!Array.isArray(s))s=[]}catch(e){}
- s.push({name,text,ts:new Date().toISOString()});while(s.length>SNAPMAX||JSON.stringify(s).length>2e6&&s.length>1)s.shift();LS.setItem('kp_snaps',JSON.stringify(s))}
+/* ---- v9 saved-scripts bridge (page side). Python can only ASK; every answer comes from Keivon, and the reply is always sent.
+   Requests are tied to the job that is running right now (worker stamps its job id); anything from a finished job is refused. ---- */
+const BR={job:0,id:null,read:null,denies:0,busy:false};let kpJobName='a script',kpJobNext=null;
+const SNAPMAX=20,SNAPCHARS=1e6;
+function snapshot(name,before,after){let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]');if(!Array.isArray(s))s=[]}catch(e){}
+ s.push({name,text:before,after,ts:new Date().toISOString()});while(s.length>SNAPMAX)s.shift();
+ for(;;){while(s.length>1&&JSON.stringify(s).length>SNAPCHARS)s.shift();try{LS.setItem('kp_snaps',JSON.stringify(s));return true}catch(e){if(s.length<=1)return false;s.shift()}}}
+const cutLine=(x,w=70)=>x.length>w?x.slice(0,w)+` …(+${x.length-w} chars)`:x;
 function miniDiff(a,b){const A=a.split('\n'),B=b.split('\n');let i=0;while(i<A.length&&i<B.length&&A[i]===B[i])i++;let j=0;while(j<A.length-i&&j<B.length-i&&A[A.length-1-j]===B[B.length-1-j])j++;
- const del=A.slice(i,A.length-j),add=B.slice(i,B.length-j);const cut=(l,p)=>l.slice(0,8).map(x=>p+' '+x.slice(0,70)).concat(l.length>8?[`${p} … ${l.length-8} more line(s)`]:[]);
- return [`@@ line ${i+1}`,...cut(del,'−'),...cut(add,'+')].join('\n')}
-function bridgeMsg(m){let v=m.t==='sget'?'{}':false;
- try{if(m.t==='sget'){
+ const del=A.slice(i,A.length-j),add=B.slice(i,B.length-j);let hidden=false;
+ const cut=(l,p)=>{if(l.length>8)hidden=true;return l.slice(0,8).map(x=>{if(x.length>70)hidden=true;return p+' '+cutLine(x)}).concat(l.length>8?[`${p} … ${l.length-8} more line(s)`]:[])};
+ // if a changed line only differs after column 70, show the area around the first difference
+ const extra=[];for(let k=0;k<Math.min(del.length,add.length,8);k++){const x=del[k],y=add[k];let d=0;while(d<x.length&&d<y.length&&x[d]===y[d])d++;if(d>=70){hidden=true;extra.push(`   line ${i+k+1}, from column ${d+1}: − …${x.slice(d,d+50)}  + …${y.slice(d,d+50)}`)}}
+ return {text:[`@@ line ${i+1}`,...cut(del,'−'),...cut(add,'+'),...extra].join('\n'),hidden}}
+function fullDiff(a,b){const A=a.split('\n'),B=b.split('\n');let i=0;while(i<A.length&&i<B.length&&A[i]===B[i])i++;let j=0;while(j<A.length-i&&j<B.length-i&&A[A.length-1-j]===B[B.length-1-j])j++;
+ return [`@@ from line ${i+1}`,...A.slice(i,A.length-j).map(x=>'- '+x),...B.slice(i,B.length-j).map(x=>'+ '+x)].join('\n')}
+const paint=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+function bridgeEnd(){BR.id=null;BR.read=false}
+async function bridgeMsg(m){let v=m.t==='sget'?'{}':false;
+ try{if(!running||BR.id===null||m.job!==BR.id){log('⛔ Refused a saved-scripts request from Python that did not come from the run in progress.','err');return}
+  if(m.t==='sget'){
    if(BR.read===null)BR.read=confirm(`${kpJobName} wants to READ your saved scripts (${Object.keys(scripts).length} of them) for this run.\n\nAllow reading for this run only?`);
    if(BR.read){const want=Array.isArray(m.names)?m.names.map(String):null;const o={};for(const k of Object.keys(scripts))if(Object.hasOwn(scripts,k)&&typeof scripts[k]==='string'&&(!want||want.includes(k)))o[k]=scripts[k];v=JSON.stringify(o)}
    else log('⛔ Reading saved scripts was not allowed for this run.','err');return}
@@ -92,15 +103,22 @@ function bridgeMsg(m){let v=m.t==='sget'?'{}':false;
   if(BR.busy){log('⛔ Rejected: another script change is still waiting for your answer.','err');return}
   if(BR.denies>=3){log('⛔ Auto-denied: you declined 3 changes in this run.','err');return}
   if(!name||!Object.hasOwn(scripts,name)||typeof scripts[name]!=='string'||text===null||text.length>500000){log('⛔ Rejected a script change from Python (unknown script or too big).','err');return}
-  const old=scripts[name];if(text===old)return;
-  const warn=!text.trim()?'\n⚠️ The new text is EMPTY.':(text.length<old.length*0.1?'\n⚠️ The new text is more than 90% smaller.':'');
-  BR.busy=true;let ok=false;
-  try{ok=confirm(`${kpJobName} wants to CHANGE your saved script "${name}".\nThe script says: "${why||'(no reason given)'}"\n${old.length} → ${text.length} characters.${warn}\n\n${miniDiff(old,text)}\n\nThe current version will be kept (Files › Undo last Python change).\nAllow this change?`)}finally{BR.busy=false}
-  if(ok){snapshot(name,old);scripts[name]=text;persist();if(name===cur)cm.setValue(text);toast2('Updated "'+name+'"')}else BR.denies++;
-  v=ok}
+  BR.busy=true;
+  try{if(name===cur){clearTimeout(dirtyT);scripts[cur]=cm.getValue();persist();if(typeof setDirty==='function')setDirty(false)}  // don't lose unsaved typing
+   const old=scripts[name];if(text===old)return;
+   const warn=!text.trim()?'\n⚠️ The new text is EMPTY.':(text.length<old.length*0.1?'\n⚠️ The new text is more than 90% smaller.':'');
+   const d=miniDiff(old,text);
+   if(d.hidden){if(!confirm(`${kpJobName} wants to CHANGE your saved script "${name}", but the change is too long to show here.\n\nOK = print the full change in the output so you can read it (you'll be asked again)\nCancel = decline`)){BR.denies++;return}
+    log(`— Proposed change to "${name}" —\n`+fullDiff(old,text)+'\n— end of proposed change —','sys');await paint();await new Promise(r=>setTimeout(r,400))}
+   const ok=confirm(`${kpJobName} wants to CHANGE your saved script "${name}".\nThe script says: "${why||'(no reason given)'}"\n${old.length} → ${text.length} characters.${warn}\n\n${d.text}${d.hidden?'\n(Some of it is cut here: the full change is in the output.)':''}\n\nThe current version will be kept (Files › Undo last Python change).\nAllow this change?`);
+   if(!ok){BR.denies++;return}
+   if(!snapshot(name,old,text)){log('⛔ Not enough storage to keep an undo copy, so the change was not applied.','err');return}
+   scripts[name]=text;persist();if(name===cur)cm.setValue(text);toast2('Updated "'+name+'"');v=true}
+  finally{BR.busy=false}}
  catch(e){console.error(e);log('⛔ Script bridge error: '+e.message,'err')}
  finally{W.postMessage({cmd:'sres',id:m.id,v})}}
 async function startWorker(){newReady();
+ if(window.kpUpdatePending){$('pystat').textContent='Update ready';log('⟳ KPython was updated. Tap the update bar to reload before restarting Python (so the app and Python stay on the same version).','sys');return}
  // Python's network rules come from the service worker. Without it in control, worker.js would load with no Allowed-sites policy, so don't start.
  if(!('serviceWorker'in navigator)||!navigator.serviceWorker.controller){$('pystat').textContent='Reload needed';
   log('⚠️ Python is paused: the offline/safety layer is not active yet, so network rules (Allowed sites) would not apply. Reloading…','err');
@@ -126,12 +144,13 @@ function onW(e){const m=e.data;
  else if(m.t==='blocked'){if(m.job!==seq)return;const s=`Blocked: ${m.o} isn't in Allowed sites. Add it in Tools > Allowed sites.`;setTimeout(()=>{flushOut&&flushOut();if(!$('out').textContent.includes(s))log(s,'err')},400)}
  else if(m.t==='sites'||m.kpSites||m.kpGetSites){console.warn('Rejected: Python tried to change Allowed sites');log('⛔ Rejected: scripts cannot change Allowed sites.','err')}
  else if(m.t==='sget'||m.t==='sset')bridgeMsg(m);
- else if(m.t==='pkgs'){const l=cleanPkgs(m.l);S('kp_pkgs',l)}
- else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');
+ else if(m.t==='pkgs'){const l=cleanPkgs(m.l);const old=cleanPkgs(J('kp_pkgs',[]));const add=l.filter(x=>!old.includes(x)),rem=old.filter(x=>!l.includes(x));
+  if(add.length&&!confirm(`${kpJobName} wants to change the packages that install automatically every time Python starts.\n\nAdd: ${add.join(', ')}${rem.length?'\nRemove: '+rem.join(', '):''}\n\nOnly allow packages you trust. Allow?`)){log('⛔ Package list change was not allowed.','err');return}S('kp_pkgs',l)}
+ else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title='Python '+m.v+' is ready. '+(m.sab?'⏹ Stop pauses your script right where it is.':'⏹ Stop restarts Python (this browser can\'t pause it in place).');$('pystat').classList.add('ok');
   $('c-unit').innerHTML=m.units.map(k=>`<option>${esc(k)}</option>`).join('');readyRes();setRunBtns();log('Python '+m.v+' ready'+(m.sab?'':' (compat mode: Stop restarts Python)'),'sys')}
  else if(m.t==='fail'){$('pystat').textContent='Python offline';$('run').textContent='Python failed to load';log(m.s,'err')}
- else if(m.t==='done'){dropOut=false;const p=pend[m.id];delete pend[m.id];if(p)p(m)}}
-function wcall(msg){return new Promise(res=>{const id=++seq;pend[id]=res;W.postMessage({...msg,id})})}
+ else if(m.t==='done'){dropOut=false;if(m.id===BR.id)bridgeEnd();const p=pend[m.id];delete pend[m.id];if(p)p(m)}}
+function wcall(msg){return new Promise(res=>{const id=++seq;pend[id]=res;if(msg.cmd==='run'||msg.cmd==='repl'){BR.id=id;BR.read=null;BR.denies=0}W.postMessage({...msg,id})})}
 function allFiles(){if(cur)scripts[cur]=cm.getValue();return scripts}
 /* inline input() box inside the output area */
 let inputMsg=null;
@@ -149,16 +168,18 @@ async function stopPy(){if(!running)return;log('⏹ Stopping…','sys');$('stop'
  hardRestart()}
 function hardRestart(){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Stopped. Python was restarted (console variables were cleared).'}));pend={};inputMsg=null;startWorker()}
 function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textContent=busy?'Running…':'▶ Run';$('stop').hidden=!busy;$('stopbtn').hidden=!busy;if(!busy){$('stop').textContent='⏹ Stop';$('stopbtn').textContent='⏹'}$('r-go').disabled=busy}
-async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;BR.job++;BR.read=null;BR.denies=0;BR.busy=false;setRunBtns();outEl=target;tuCanvas=turtle;
+async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;BR.job++;BR.read=null;BR.denies=0;BR.busy=false;kpJobName=kpJobNext||'A Python tool';kpJobNext=null;setRunBtns();outEl=target;tuCanvas=turtle;
  try{const r=await wcall(msg);if(!r.ok&&r.err)log(r.err,'err');return r}finally{outEl=null;tuCanvas=null;running=false;setRunBtns()}}
 async function runPy(code,o={}){const r=await job({cmd:'run',code,files:allFiles(),fname:'__kp_run__.py'},o);return r.ok}
-async function run(){try{const i=cm.display.input;i.forceCompositionEnd?.();if(i.pollContent)i.pollContent();else i.poll?.()}catch(e){}/* read pending paste/IME text into the doc synchronously */clearTimeout(dirtyT);if(typeof setDirty==='function')setDirty(false);scripts[cur]=cm.getValue();persist();clearErr();kpJobName='Your script "'+cur+'"';log('— run '+cur+' —','sys');const t0=performance.now();
+async function run(){try{const i=cm.display.input;i.forceCompositionEnd?.();if(i.pollContent)i.pollContent();else i.poll?.()}catch(e){}/* read pending paste/IME text into the doc synchronously */clearTimeout(dirtyT);if(typeof setDirty==='function')setDirty(false);scripts[cur]=cm.getValue();persist();clearErr();kpJobNext='Your script "'+cur+'"';log('— run '+cur+' —','sys');const t0=performance.now();
  const r=await job({cmd:'run',code:cm.getValue(),files:allFiles(),fname:modname(cur)+'.py'});log(`— ${r.ok?'done':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'stopped':'error')} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys')}
-$('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
+$('run').onclick=run;
+$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
 async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
 function toast2(t){let d=$('toast');if(!d){d=document.createElement('div');d.id='toast';document.body.appendChild(d)}d.textContent=t;d.classList.add('on');clearTimeout(d._t);d._t=setTimeout(()=>d.classList.remove('on'),2200)}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>startWorker());else setTimeout(startWorker,0); // after all scripts (app4.js: syncSites, linkify) load
+{const go=()=>(window.requestIdleCallback?requestIdleCallback(()=>startWorker(),{timeout:1500}):setTimeout(startWorker,200)); // v9 perf: start Python when the page is idle
+ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()} // after all scripts (app4.js: syncSites, linkify) load
 
 /* packages */
 async function installPkg(name){name=name.trim();if(!name)return;showView('v-code');log('Installing '+name+'…','sys');
@@ -207,7 +228,7 @@ $('m-add').onclick=()=>{const mi=+$('m-mi').value;if(!mi)return alert('Enter mil
 // calc
 $('c-tipgo').onclick=async()=>{await pyReady;$('c-tipout').textContent=await pycall('tip_calc',$('c-bill').value,$('c-tip').value,$('c-ppl').value)};
 $('c-ugo').onclick=async()=>{await pyReady;$('c-uout').textContent=await pycall('convert',$('c-val').value,$('c-unit').value)};
-document.querySelectorAll('[data-snip]').forEach(b=>b.onclick=()=>{const s=SNIPPETS.find(x=>x.name.startsWith(b.dataset.snip));newScript(s.name+' ('+s.by+')',s.code);showView('v-code');run()});
+document.querySelectorAll('[data-snip]').forEach(b=>b.onclick=()=>{const s=SNIPPETS.find(x=>x.name.startsWith(b.dataset.snip));if(!s||!confirm(`Open "${s.name}" as a new script and run it now?`))return;newScript(s.name+' ('+s.by+')',s.code);showView('v-code');run()});
 function renderTools(){for(const f of [renderHours,renderBudget,renderMiles])try{f()}catch(e){console.error(e)}}
 
 /* ---------- Fun (Python bits) ---------- */
@@ -225,7 +246,7 @@ function renderFiles(){$('f-list').innerHTML=Object.keys(scripts).map(n=>`<div c
  $('f-list').querySelectorAll('.item').forEach((it,i)=>{const n=Object.keys(scripts)[i];it.querySelectorAll('button').forEach(b=>b.onclick=()=>{if(cur)scripts[cur]=cm.getValue();const a=b.dataset.a;
   if(a==='open'){cur=n;refresh();showView('v-code')}else if(a==='dup'){newScript(n+' copy',scripts[n]);renderFiles()}
   else if(a==='ren'){const m=prompt('New name',n);if(m&&m!==n&&!(m in scripts)){scripts[m]=scripts[n];delete scripts[n];if(cur===n)cur=m;refresh();renderFiles()}}
-  else if(a==='del'&&confirm('Delete '+n+'?')){delete scripts[n];if(cur===n)cur='';refresh();renderFiles()}})})}
+  else if(a==='del'&&confirm('Delete '+n+'?\n(You can bring it back with Files › ↶ Undo.)')){if(typeof scripts[n]==='string')snapshot(n,scripts[n],null);delete scripts[n];if(cur===n)cur='';refresh();renderFiles()}})})}
 const cats=[...new Set(SNIPPETS.map(s=>s.cat))];$('sn-filter').innerHTML+=cats.map(c=>`<option>${esc(c)}</option>`).join('');
 function renderSnips(){const f=$('sn-filter').value;$('snip-list').innerHTML=SNIPPETS.map((s,i)=>(!f||s.cat===f)?`<div class="snip"><b>${esc(s.name)}</b><span class="by">${s.by!=='KPython'?'🤖 by '+esc(s.by)+(s.cat!=='Team'?' · '+esc(s.cat):''):esc(s.cat)}</span><div class="row"><button data-i="${i}" data-a="open">Open</button><button data-i="${i}" data-a="run" class="pri">▶ Run</button></div></div>`:'').join('');
  $('snip-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{const s=SNIPPETS[b.dataset.i];newScript(s.name+(s.by!=='KPython'?' ('+s.by+')':''),s.code);showView('v-code');if(b.dataset.a==='run')run()})}
@@ -249,15 +270,20 @@ function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||d.
  if(ent.length>500)throw new Error('Backup has more than 500 scripts');
  const skipped=[];const ok={};for(const [k,v] of ent){if(typeof v!=='string'||!k||k.length>100||BAD_NAMES.includes(k)||v.length>2e6)skipped.push('script "'+String(k).slice(0,40)+'"');else ok[k]=v}
  if(!Object.keys(ok).length&&ent.length)throw new Error('No valid scripts in backup');
- const next=Object.assign(Object.create(null),scripts);for(const k in ok)next[k]=ok[k];scripts={...next};if(skipped.length)setTimeout(()=>alert('Skipped: '+skipped.join(', ')),0);cur=d.cur in scripts?d.cur:cur;const bad=[];const dd=(d.data&&typeof d.data==='object')?d.data:{};Object.keys(dd).filter(k=>Object.hasOwn(dd,k)).forEach(k=>{const v=dd[k];if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}else bad.push(k+' (unknown)')});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
+ const next=Object.assign(Object.create(null),scripts);for(const k in ok)next[k]=ok[k];scripts={...next};if(skipped.length)setTimeout(()=>alert('Skipped: '+skipped.join(', ')),0);cur=typeof d.cur==='string'&&Object.hasOwn(scripts,d.cur)?d.cur:cur;const bad=[];const dd=(d.data&&typeof d.data==='object')?d.data:{};Object.keys(dd).filter(k=>Object.hasOwn(dd,k)).forEach(k=>{const v=dd[k];if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}else bad.push(k+' (unknown)')});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
 $('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>10*1024*1024){alert('Backup file is over 10 MB; not imported.');e.target.value='';return}try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.data&&'kp_sites'in d.data&&typeof applySites==='function')applySites('Imported Allowed sites');if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 
 refresh();renderTools();renderSnips();setupLock();
-const KP_APPV='kpython-v8';  // must match the cache name in sw.js
+const KP_APPV='kpython-v9';  // must match the cache name in sw.js
 if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{})})}).catch(()=>{});
- let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(typeof offStatus==='function')offStatus();if(reloaded)return;
-  if(!running&&!inputMsg){reloaded=true;toast2('KPython updated. Reloading…');setTimeout(()=>location.reload(),800)}else toast2('KPython update ready: reload when your script finishes.')})}
+ // v9: never reload by itself. Save the editor now and offer a "tap to reload" bar instead.
+ const hadCtl=!!navigator.serviceWorker.controller;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(typeof offStatus==='function')offStatus();if(!hadCtl)return;window.kpUpdatePending=true;
+  try{clearTimeout(dirtyT);if(cur&&Object.hasOwn(scripts,cur)){scripts[cur]=cm.getValue();persist();if(typeof setDirty==='function')setDirty(false)}}catch(e){}
+  if(document.getElementById('updbar'))return;const b=document.createElement('button');b.id='updbar';b.className='pri';b.setAttribute('role','status');
+  b.textContent='⟳ KPython update ready. Tap to reload (your scripts are saved).';
+  b.onclick=()=>{if(running&&!confirm('Python is still running. Reload anyway?'))return;try{clearTimeout(dirtyT);scripts[cur]=cm.getValue();persist()}catch(e){}location.reload()};document.body.appendChild(b)})}
 window.KP={exportData,importData,runPy,get pyReady(){return pyReady},stopPy,cm:()=>cm};

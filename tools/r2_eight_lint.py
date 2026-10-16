@@ -126,6 +126,14 @@ class Thing:
 x = "''' + "a" * 110 + '''"
 '''
 
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    issues = lint("import os\nx = 1\n")
+    assert issues and any("os" in str(i) for i in issues), issues
+    assert any("line" in str(i).lower() or "syntax" in str(i).lower() for i in lint("def (:\n"))
+    print('self-tests passed')
+
 if __name__ == "__main__":
     print("--- sample ---")
     report(SAMPLE)

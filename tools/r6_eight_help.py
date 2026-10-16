@@ -145,6 +145,25 @@ ENTRIES = ([dict(label=l, tab="Dev", purpose=p, how=h, example=e, keywords=k) fo
            + [dict(label=l, tab="Tools", purpose=p, how=h, example=e, keywords=k) for l, p, h, e, k in _TOOLS])
 
 
+# --- KPython v9: detailed More-button help (Eight, r7) and app features, merged by label ---
+try:
+    from r7_eight_morehelp import MORE_ENTRIES as _KP_MORE
+    _kp_idx = {e["label"]: i for i, e in enumerate(ENTRIES)}
+    for _e in _KP_MORE:
+        if _e["label"] in _kp_idx: ENTRIES[_kp_idx[_e["label"]]] = dict(_e)
+        else: ENTRIES.append(dict(_e))
+except ImportError:
+    pass
+for _l, _tab, _p, _h, _x, _k in [
+    ("🔎 Search tools", "App", "Command palette: find any tool or button by typing part of its name.", "Tap 🔎 in the header (or Ctrl/Cmd+K), type, then tap a result or press Enter.", "Type 'sites' to jump to Tools > Allowed sites.", "palette search command find launch"),
+    ("↶ Undo last Python change", "Files", "Restores a saved script changed by a tool (Replace in saved scripts, 3-way merge). Keeps the last 20.", "Files > ↶ Undo last Python change, then confirm.", "After a merge you didn't like, tap it to get the old text back.", "undo restore revert saved script bridge"),
+    ("🌐 Allowed sites", "Tools", "The only websites Python may connect to. Only this screen can change it.", "Tools > 🌐 Allowed sites: type an https origin, Add, type yes.", "Add https://api.example.com, then pyfetch it from a script.", "network allow list sites https blocked cors"),
+    ("🧭 Tour", "App", "A 10-step getting-started walkthrough.", "Dev > Understand & learn > 🧭 Tour (offered once on first launch).", "Enter = next, b = back, q = quit.", "tour intro getting started tutorial help"),
+    ("🩺 Self-test all", "Dev", "Runs every tool's built-in self-test with a time limit and shows PASS/FAIL/SKIP.", "Dev > Check & test > 🩺 Self-test all, then press Enter.", "All tools should PASS or SKIP.", "self test all tools check health"),
+]:
+    if not any(e["label"] == _l for e in ENTRIES):
+        ENTRIES.append(dict(label=_l, tab=_tab, purpose=_p, how=_h, example=_x, keywords=_k))
+
 def _norm(s):
     return " ".join(s.lower().split())
 
@@ -206,7 +225,7 @@ def main():
     while True:
         try:
             q = input("help> ").strip()
-        except EOFError:
+        except (EOFError, KeyboardInterrupt):
             break
         if not q:
             break
@@ -224,8 +243,8 @@ def main():
 
 
 def _self_test():
-    assert len(ENTRIES) == 55 and len({e["label"] for e in ENTRIES}) == 55
-    assert sum(e["tab"] == "Dev" for e in ENTRIES) == 41 and sum(e["tab"] == "Tools" for e in ENTRIES) == 14
+    assert len(ENTRIES) >= 55 and len({e["label"] for e in ENTRIES}) == len(ENTRIES)  # KPython: more entries merged in v9
+    assert sum(e["tab"] == "Dev" for e in ENTRIES) >= 41 and sum(e["tab"] == "Tools" for e in ENTRIES) >= 14
     assert get("🧽 Quote")["tab"] == "Tools" and get("quote")["label"] == "🧽 Quote"
     assert search("mileage")[0]["label"] == "🚗 Miles" and search("invoice")[0]["tab"] == "Tools"
     assert len(search("tools")) >= 14 and all(e["tab"] == "Tools" for e in search("rent check"))
@@ -243,32 +262,12 @@ def _self_test():
     print("self-test OK")
 
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "split_cells", "merge3", "parse_requirements", "scan_setup", "parse_cron", "parse_any", "analyze_lines"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT", "HOME")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     import sys

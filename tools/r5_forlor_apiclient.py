@@ -44,7 +44,7 @@ def save(data, path=STORE, confirm=True):
     if len(text.encode()) > MAX_BYTES:
         raise ValueError("Collection would exceed 500KB")
     p = safe_path(path)
-    if confirm and os.path.exists(p) and input(f"Overwrite {path}? (y/N): ").strip().lower() != "y":
+    if confirm and os.path.exists(p) and input(f"Overwrite {path}? (y/N): ").strip().lower() not in ("y", "yes"):
         print("Not saved."); return False
     with open(p, "w", encoding="utf-8") as f:
         f.write(text)
@@ -127,7 +127,7 @@ def run(req, variables):
     method, url, headers, body = build(req, variables)
     print(f"{method} {url}")
     for k, v in mask_headers(headers).items(): print(f"  {k}: {v}")
-    if input("Send it? (y/N): ").strip().lower() != "y":
+    if input("Send it? (y/N): ").strip().lower() not in ("y", "yes"):
         print("Cancelled."); return
     try:
         import pyodide.http  # noqa
@@ -141,7 +141,8 @@ def _read_headers():
     print("Headers as Name: value, blank line to finish. Secret headers (Authorization, tokens) are asked each run, never saved.")
     h = {}
     while True:
-        line = input("  > ").strip()
+        try: line = input("  > ").strip()
+        except (KeyboardInterrupt, EOFError): return h
         if not line: return h
         if ":" in line:
             k, v = line.split(":", 1)
@@ -151,10 +152,38 @@ def _read_body():
     print("Body (END to finish, or just END for none):")
     lines = []
     while True:
-        l = input()
+        try: l = input()
+        except (KeyboardInterrupt, EOFError): break
         if l.strip() == "END": break
         lines.append(l)
     return "\n".join(lines).strip() or None
+
+def _pick(n):
+    """KPython: 1-based request number; 0, negatives, junk and blank never pick a request."""
+    if not n: print("No saved requests yet."); return None
+    while True:
+        s = input(f"Number (1-{n}, blank = back): ").strip().lower()
+        if not s or s == "q": return None
+        if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
+        print(f"Enter a number 1-{n}.")
+
+def _pick(n):
+    """KPython: 1-based request number; 0, negatives, junk and blank never pick a request."""
+    if not n: print("No saved requests yet."); return None
+    while True:
+        s = input(f"Number (1-{n}, blank = back): ").strip().lower()
+        if not s or s == "q": return None
+        if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
+        print(f"Enter a number 1-{n}.")
+
+def _pick(n):
+    """KPython: 1-based request number; 0, negatives, junk and blank never pick a request."""
+    if not n: print("No saved requests yet."); return None
+    while True:
+        s = input(f"Number (1-{n}, blank = back): ").strip().lower()
+        if not s or s == "q": return None
+        if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
+        print(f"Enter a number 1-{n}.")
 
 def main():
     data = load()
@@ -166,7 +195,10 @@ def main():
         c = input("[r]un  [a]dd  [d]elete  [v]ar  [s]elf-test  [q]uit: ").strip().lower()
         names = list(data["requests"])
         try:
-            if c == "q": return
+            if c in ("q", "quit"): return
+            if c not in ("r", "a", "d", "v", "s"):
+                if c: print("Pick r, a, d, v, s or q.")
+                continue
             if c == "s": self_test(); continue  # KPython: back to the menu
             if c == "v":
                 k = input("Variable name: ").strip(); v = input("Value (blank to remove): ")
@@ -176,18 +208,22 @@ def main():
                 save(data, confirm=False)
             elif c == "a":
                 n = input("Request name: ").strip()
-                if n in data["requests"] and input("Exists. Replace? (y/N): ").strip().lower() != "y": continue
+                if n in data["requests"] and input("Exists. Replace? (y/N): ").strip().lower() not in ("y", "yes"): continue
                 m = (input(f"Method {METHODS} [GET]: ").strip().upper() or "GET")
                 if m not in METHODS: print("Bad method"); continue
                 data["requests"][n] = {"method": m, "url": input("URL (can use {{base}}): ").strip(),
                                        "headers": _read_headers(), "body": _read_body() if m != "GET" else None}
                 save(data, confirm=False); print("Saved (without secrets).")
             elif c == "d":
-                n = names[int(input("Number: ")) - 1]
-                if input(f"Delete {n}? (y/N): ").strip().lower() == "y":
+                i = _pick(len(names))
+                if i is None: continue
+                n = names[i]
+                if input(f"Delete {n}? (y/N): ").strip().lower() in ("y", "yes"):
                     del data["requests"][n]; save(data, confirm=False)
             elif c == "r":
-                n = names[int(input("Number: ")) - 1]
+                i = _pick(len(names))
+                if i is None: continue
+                n = names[i]
                 fut = run(data["requests"][n], data["vars"])
                 if fut is not None: return fut  # KPython: Dev tab awaits it  # browser: let the event loop finish the request
         except (ValueError, KeyError, IndexError) as e:
@@ -221,32 +257,12 @@ def self_test():
         safe_path = old
     print("All self-tests passed.")
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "explain", "gen_tests", "scan_code", "to_fstrings", "extract", "inline", "check"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()

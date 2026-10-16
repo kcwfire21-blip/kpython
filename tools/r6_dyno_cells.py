@@ -28,26 +28,62 @@ def split_cells(src):
     return cells
 
 def new_ns():
-    return {"__name__": "__cells__"}
+    # KPython (Drop r7): cells don't get the app's kp_* bridges, and can't replace them for other tools
+    import builtins
+    return {"__name__": "__cells__", "__builtins__": {k: v for k, v in vars(builtins).items() if not k.startswith("kp_")}}
 
-def run_cell(code, ns, idx):
-    buf = io.StringIO()
+CELL_OUT_MAX = 200_000   # KPython: cap captured output per cell
+CELL_TIMEOUT = 60.0      # KPython: per-cell time limit (Python-level code); Stop always works too
+
+class _CapBuf(io.StringIO):
+    def __init__(self):
+        super().__init__(); self.cut = False
+    def write(self, s):
+        if self.tell() >= CELL_OUT_MAX:
+            self.cut = True; return len(s)
+        return super().write(s[:CELL_OUT_MAX - self.tell()])
+
+class CellTimeout(Exception):
+    pass
+
+def run_cell(code, ns, idx, timeout=None):
+    import builtins
+    buf = _CapBuf()
     t0 = time.perf_counter()
     ok = True
+    real_out = sys.stdout
+    def _cell_input(prompt=""):  # KPython: show this cell's output so far, then the prompt
+        real_out.write(buf.getvalue()); buf.seek(0); buf.truncate()
+        with contextlib.redirect_stdout(real_out):
+            return builtins.input(prompt)
+    ns["__builtins__"]["input"] = _cell_input if isinstance(ns.get("__builtins__"), dict) else None
+    if not isinstance(ns.get("__builtins__"), dict): ns["input"] = _cell_input
+    deadline = t0 + (CELL_TIMEOUT if timeout is None else timeout)
+    def tr(frame, event, arg):
+        if time.perf_counter() > deadline:
+            raise CellTimeout(f"cell took longer than {deadline - t0:.0f}s")
+        return tr
+    old = sys.gettrace()
     try:
-        real_out = sys.stdout
-        def _cell_input(prompt=""):  # KPython: input() inside a cell shows the output so far and the prompt
-            real_out.write(buf.getvalue()); buf.seek(0); buf.truncate()
-            with contextlib.redirect_stdout(real_out):
-                import builtins as _b
-                return _b.input(prompt)
-        ns.setdefault("input", _cell_input)
         with contextlib.redirect_stdout(buf):
-            exec(compile(code, f"<cell {idx}>", "exec"), ns)
+            sys.settrace(tr)
+            try:
+                exec(compile(code, f"<cell {idx}>", "exec"), ns)
+            finally:
+                sys.settrace(old)
+    except KeyboardInterrupt:
+        real_out.write(buf.getvalue()); raise          # Stop / Cancel: show what we have, then stop
+    except SystemExit as e:
+        ok = False; buf.write(f"exit() was called in this cell (code {e.code}); the cell runner keeps going.\n")
+    except CellTimeout as e:
+        ok = False; buf.write(f"Stopped: {e}.\n")
     except Exception:
         ok = False
-        buf.write(traceback.format_exc(limit=-3))
-    return ok, buf.getvalue(), (time.perf_counter() - t0) * 1000
+        et, ev, tb = sys.exc_info()
+        frames = [f for f in traceback.extract_tb(tb) if f.filename.startswith("<cell")]  # KPython: hide the runner's own frames
+        buf.write("Traceback (most recent call last):\n" + "".join(traceback.format_list(frames)) + "".join(traceback.format_exception_only(et, ev)))
+    out = buf.getvalue() + ("\n…[output truncated]" if buf.cut else "")
+    return ok, out, (time.perf_counter() - t0) * 1000
 
 def run_range(cells, ns, idxs):
     results = []
@@ -58,6 +94,104 @@ def run_range(cells, ns, idxs):
         if not ok:
             break
     return results
+
+def cells_to_src(cells):
+    return "\n".join(f"# %% {t}\n{c.rstrip()}\n" for t, c in cells)
+
+def edit_cells(cells, path):
+    """KPython: add, delete, reorder cells; w writes them back to the file. Returns True if unsaved edits remain."""
+    dirty = False
+    while True:
+        for i, (t, c) in enumerate(cells, 1):
+            print(f" {i}. {t}  ({len(c.splitlines())} lines)")
+        s = input("Edit: + N = add after N (0 = top) | d N = delete | m N M = move N to M | w = write file | blank = back: ").strip().lower()
+        if not s or s in ("q", "b"):
+            return dirty
+        p = s.replace("+", "+ ").split()
+        try:
+            if p[0] == "w":
+                if input(f"Write {len(cells)} cell(s) to {path}? (y/N): ").strip().lower() in ("y", "yes"):
+                    text = cells_to_src(cells)
+                    if len(text) > MAX_BYTES: raise ValueError("over 500KB")
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f: f.write(text)
+                    os.replace(tmp, path); print("Written."); dirty = False
+            elif p[0] == "+" and len(p) == 2:
+                n = int(p[1])
+                if not 0 <= n <= len(cells): raise ValueError
+                title = input("Cell title: ").strip() or f"cell {len(cells) + 1}"
+                print("Type or paste the cell code, END on its own line to finish:")
+                lines = []
+                while True:
+                    try: l = input()
+                    except (KeyboardInterrupt, EOFError): break
+                    if l.strip() == "END": break
+                    lines.append(l)
+                cells.insert(n, (title, "\n".join(lines))); dirty = True
+            elif p[0] == "d" and len(p) == 2:
+                n = int(p[1])
+                if not 1 <= n <= len(cells): raise ValueError
+                if input(f"Delete cell {n} ({cells[n-1][0]})? (y/N): ").strip().lower() in ("y", "yes"):
+                    cells.pop(n - 1); dirty = True
+            elif p[0] == "m" and len(p) == 3:
+                a, b = int(p[1]), int(p[2])
+                if not (1 <= a <= len(cells) and 1 <= b <= len(cells)): raise ValueError
+                cells.insert(b - 1, cells.pop(a - 1)); dirty = True
+            else:
+                raise ValueError
+        except (ValueError, OSError) as e:
+            print(f"Use + N, d N, m N M, w, or blank. Cells are numbered 1-{len(cells)}." + (f" ({e})" if str(e) else ""))
+        if not cells:
+            return dirty
+
+def cells_to_src(cells):
+    return "\n".join(f"# %% {t}\n{c.rstrip()}\n" for t, c in cells)
+
+def edit_cells(cells, path):
+    """KPython: add, delete, reorder cells; w writes them back to the file. Returns True if unsaved edits remain."""
+    dirty = False
+    while True:
+        for i, (t, c) in enumerate(cells, 1):
+            print(f" {i}. {t}  ({len(c.splitlines())} lines)")
+        s = input("Edit: + N = add after N (0 = top) | d N = delete | m N M = move N to M | w = write file | blank = back: ").strip().lower()
+        if not s or s in ("q", "b"):
+            return dirty
+        p = s.replace("+", "+ ").split()
+        try:
+            if p[0] == "w":
+                if input(f"Write {len(cells)} cell(s) to {path}? (y/N): ").strip().lower() in ("y", "yes"):
+                    text = cells_to_src(cells)
+                    if len(text) > MAX_BYTES: raise ValueError("over 500KB")
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f: f.write(text)
+                    os.replace(tmp, path); print("Written."); dirty = False
+            elif p[0] == "+" and len(p) == 2:
+                n = int(p[1])
+                if not 0 <= n <= len(cells): raise ValueError
+                title = input("Cell title: ").strip() or f"cell {len(cells) + 1}"
+                print("Type or paste the cell code, END on its own line to finish:")
+                lines = []
+                while True:
+                    try: l = input()
+                    except (KeyboardInterrupt, EOFError): break
+                    if l.strip() == "END": break
+                    lines.append(l)
+                cells.insert(n, (title, "\n".join(lines))); dirty = True
+            elif p[0] == "d" and len(p) == 2:
+                n = int(p[1])
+                if not 1 <= n <= len(cells): raise ValueError
+                if input(f"Delete cell {n} ({cells[n-1][0]})? (y/N): ").strip().lower() in ("y", "yes"):
+                    cells.pop(n - 1); dirty = True
+            elif p[0] == "m" and len(p) == 3:
+                a, b = int(p[1]), int(p[2])
+                if not (1 <= a <= len(cells) and 1 <= b <= len(cells)): raise ValueError
+                cells.insert(b - 1, cells.pop(a - 1)); dirty = True
+            else:
+                raise ValueError
+        except (ValueError, OSError) as e:
+            print(f"Use + N, d N, m N M, w, or blank. Cells are numbered 1-{len(cells)}." + (f" ({e})" if str(e) else ""))
+        if not cells:
+            return dirty
 
 def show(results):
     for n, title, ok, out, ms in results:
@@ -79,6 +213,12 @@ def self_test():
         kp_safe_path("../../etc/passwd"); assert False
     except ValueError:
         pass
+    assert "run_cell" not in out and "<cell 2>" in out, out
+    c2 = [("a", "x = 1"), ("b", "y = 2")]
+    assert [(t, x.strip()) for t, x in split_cells(cells_to_src(c2))] == c2
+    assert "run_cell" not in out and "<cell 2>" in out, out
+    c2 = [("a", "x = 1"), ("b", "y = 2")]
+    assert [(t, x.strip()) for t, x in split_cells(cells_to_src(c2))] == c2
     print("self-tests passed")
 
 def main():
@@ -92,61 +232,51 @@ def main():
             raise ValueError("Not a .py file.")
         if os.path.getsize(path) > MAX_BYTES:
             raise ValueError("File over 500KB.")
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             cells = split_cells(f.read())
     except ValueError as e:
         print("Error:", e); return
     if not cells:
         print("No cells found."); return
-    ns = new_ns()
+    ns = new_ns(); dirty = False
     while True:
         print()
         for i, (t, c) in enumerate(cells, 1):
             print(f" {i}. {t}  ({len(c.splitlines())} lines)")
-        cmd = input("Run: number | a=all | u N=up to N | r=reset | q=quit: ").strip().lower()
-        if cmd == "q":
+        cmd = input("Run: number | a=all | u N=up to N | r=reset | e=edit cells | q=quit (Stop interrupts a cell): ").strip().lower()
+        if cmd in ("q", "quit", ""):
+            if dirty and input("Cell edits aren't written to the file. Quit anyway? (y/N): ").strip().lower() not in ("y", "yes"):
+                continue
             break
+        if cmd == "e":
+            dirty = edit_cells(cells, path) or dirty
+            if not cells: print("No cells left."); break
+            continue
         if cmd == "r":
             ns = new_ns(); print("Namespace reset."); continue
         try:
             if cmd == "a":
                 idxs = range(len(cells))
             elif cmd.startswith("u"):
-                n = int(cmd[1:].strip()); idxs = range(min(n, len(cells)))
+                n = int(cmd[1:].strip())
+                if n < 1: raise ValueError
+                idxs = range(min(n, len(cells)))
             else:
-                n = int(cmd); assert 1 <= n <= len(cells); idxs = [n - 1]
-        except (ValueError, AssertionError):
-            print("Invalid choice."); continue
-        if input(f"Run {len(idxs)} cell(s)? (y/n): ").strip().lower() != "y":
+                n = int(cmd)
+                if not 1 <= n <= len(cells): raise ValueError
+                idxs = [n - 1]
+        except ValueError:
+            print(f"Pick 1-{len(cells)}, a, u N, r or q."); continue
+        if input(f"Run {len(idxs)} cell(s)? (y/N): ").strip().lower() not in ("y", "yes"):
             print("Cancelled."); continue
         show(run_range(cells, ns, idxs))
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "split_cells", "merge3", "parse_requirements", "scan_setup", "parse_cron", "parse_any", "analyze_lines"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT", "HOME")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()

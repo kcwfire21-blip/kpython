@@ -165,5 +165,16 @@ def main():
             print("Error:", e)
 
 
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    a, b = "x\ny\n", "x\nz\n"
+    u = unified(a, b); assert "-y" in u and "+z" in u, u
+    assert apply_patch(a, u) == b
+    side_by_side(a, b)
+    try: safe_path("../../etc/passwd"); raise AssertionError("escape")
+    except (ValueError, PermissionError): pass
+    print('self-tests passed')
+
 if __name__ == "__main__":
     main()

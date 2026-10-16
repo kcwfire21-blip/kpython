@@ -1,8 +1,8 @@
 // KPython v6 service worker: allowlisted offline cache, cross-origin isolation headers, pinned Pyodide hashes, worker CSP, input() bridge fallback.
-importScripts('./sites.js?v=8');
-const C='kpython-v8';
-const SHELL=['./','./sites.js','./index.html','./app.css','./app.js','./app4.js','./palette.js','./games.js','./github.js','./snippets.js','./worker.js','./kp_setup.py','./kp_worker.py','./manifest.json','./apple-touch-icon.png','./icon-192.png','./icon-512.png',
- ...['r6_eight_help','r6_dyno_cells','r6_forlor_time','r6_getback_audit','r6_drop_merge','r6_bot3_bigo','r6_bot2_cheats','r6_bot2help_logs','r5_eight_todo','r5_dyno_testgen','r5_forlor_apiclient','r5_getback_pwgen','r5_drop_search','r5_bot3_timeit','r5_bot2_explain','r5_bot2help_chart','r5_bot_refactor','r4_eight_markdown','r4_dyno_coverage','r4_forlor_convert','r4_getback_secrets','r4_drop_packages','r4_bot3_memory','r4_bot2_katas','r4_bot2help_imports','r4_bot_docgen','r3_eight_format','r3_dyno_regex','r3_forlor_json','r3_getback_codec','r3_drop_history','r3_bot3_debugger','r3_bot2_snippets','r3_bot2help_metrics','r3_bot_typecheck','r2_eight_lint','r2_dyno_tests','r2_forlor_http','r2_drop_diff','r2_getback_sql','r2_bot3_profile','r2_bot2help_data','r2_bot2_outline','r2_bot_projects'].map(n=>'./tools/'+n+'.py')];
+importScripts('./sites.js?v=9');
+const C='kpython-v9';
+const SHELL=['./','./sites.js','./index.html','./app.css','./app.js','./app4.js','./palette.js','./a11y.js','./games.js','./github.js','./snippets.js','./worker.js','./kp_setup.py','./kp_worker.py','./manifest.json','./apple-touch-icon.png','./icon-192.png','./icon-512.png',
+ ...['kp_common','r7_bot2_tour','r7_dyno_selftest_all','r7_bot_benchq','r6_eight_help','r6_dyno_cells','r6_forlor_time','r6_getback_audit','r6_drop_merge','r6_bot3_bigo','r6_bot2_cheats','r6_bot2help_logs','r5_eight_todo','r5_dyno_testgen','r5_forlor_apiclient','r5_getback_pwgen','r5_drop_search','r5_bot3_timeit','r5_bot2_explain','r5_bot2help_chart','r5_bot_refactor','r4_eight_markdown','r4_dyno_coverage','r4_forlor_convert','r4_getback_secrets','r4_drop_packages','r4_bot3_memory','r4_bot2_katas','r4_bot2help_imports','r4_bot_docgen','r3_eight_format','r3_dyno_regex','r3_forlor_json','r3_getback_codec','r3_drop_history','r3_bot3_debugger','r3_bot2_snippets','r3_bot2help_metrics','r3_bot_typecheck','r2_eight_lint','r2_dyno_tests','r2_forlor_http','r2_drop_diff','r2_getback_sql','r2_bot3_profile','r2_bot2help_data','r2_bot2_outline','r2_bot_projects'].map(n=>'./tools/'+n+'.py')];
 const CM='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/',PY='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
 const CDN=[CM+'codemirror.min.css',CM+'theme/dracula.min.css',CM+'codemirror.min.js',CM+'mode/python/python.min.js',CM+'addon/edit/matchbrackets.min.js',CM+'addon/edit/closebrackets.min.js',
  CM+'addon/search/searchcursor.min.js',CM+'addon/hint/show-hint.min.js',CM+'addon/hint/show-hint.min.css',
@@ -22,7 +22,10 @@ async function sha384(buf){const d=await crypto.subtle.digest('SHA-384',buf);let
 async function verified(u,res){const f=u.startsWith(PY)?u.slice(PY.length):null;if(!f||!PIN[f]||!res.ok)return res;
  const buf=await res.clone().arrayBuffer();if(await sha384(buf)!==PIN[f])return new Response('Integrity check failed for '+f,{status:502});return res}
 async function getCDN(u){const res=await verified(u,await fetch(corsReq(u)));if(!res.ok)throw new Error(u+' '+res.status);return res}
-self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(async c=>{await c.addAll(SHELL);await Promise.all(CDN.map(u=>getCDN(u).then(r=>c.put(u,r)).catch(()=>{})))}));self.skipWaiting()});
+// v9 perf: install precaches only the app shell + CodeMirror. Tools and the Pyodide core are cached on first use
+// (Pyodide still goes through getCDN, so every SHA-384 pin is checked before anything is cached).
+const CORE=SHELL.filter(u=>!u.startsWith('./tools/'));const CMCDN=CDN.filter(u=>u.startsWith(CM));
+self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(async c=>{await c.addAll(CORE);await Promise.all(CMCDN.map(u=>getCDN(u).then(r=>c.put(u,r)).catch(()=>{})))}));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C&&k!==CFG).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 function iso(res,same,url,sites){if(!res||res.status===0||res.type==='opaqueredirect')return res;const h=new Headers(res.headers);
  h.set('Cross-Origin-Embedder-Policy','require-corp');h.set('Cross-Origin-Opener-Policy','same-origin');h.set('Cross-Origin-Resource-Policy',same?'same-origin':'cross-origin');
@@ -41,7 +44,10 @@ const cacheable=u=>u.startsWith(PY)||u.startsWith(CM)||u.startsWith('https://fil
 self.addEventListener('fetch',e=>{const r=e.request;const u=r.url;const same=u.startsWith(self.location.origin);
  if(same&&new URL(u).pathname.endsWith('/__kp_input')){const id=new URL(u).searchParams.get('id')||'';if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)||waiting[id]){e.respondWith(new Response('bad id',{status:400}));return}e.respondWith(new Promise(res=>{waiting[id]={res,t:setTimeout(()=>answer(id,'',true),600000)}}));return}
  if(r.method!=='GET')return;
- if(same){const key=new URL(u);key.search='';const listed=SHELL_URLS.has(key.href)||r.mode==='navigate';
-  e.respondWith(loadSites().then(sites=>fetch(r).then(res=>{if(res.ok&&listed&&!new URL(u).search){const cl=res.clone();caches.open(C).then(c=>c.put(r,cl))}return iso(res,true,u,sites)})
-   .catch(()=>caches.match(r).then(m=>m||(r.mode==='navigate'?caches.match(new URL('./index.html',self.location).href):null)).then(m=>m?iso(m,true,u,sites):Response.error()))));return}
+ // v9 perf: cache-first for the app's own files. The cache is versioned (C); a new sw.js installs a new cache and the page
+ // shows "update ready, tap to reload", so updates still arrive. Unlisted same-origin files stay network-first.
+ if(same){const key=new URL(u);key.search='';const nav=r.mode==='navigate';const listed=SHELL_URLS.has(key.href)||nav;
+  const fromNet=()=>fetch(r).then(res=>{if(res.ok&&listed&&!new URL(u).search&&!nav){const cl=res.clone();caches.open(C).then(c=>c.put(r,cl))}return res});
+  const fromCache=()=>caches.open(C).then(c=>nav?c.match(new URL('./index.html',self.location).href).then(m=>m||c.match(new URL('./',self.location).href)):(!new URL(u).search?c.match(key.href):null));
+  e.respondWith(loadSites().then(async sites=>{let res=listed?await fromCache():null;if(!res){try{res=await fromNet()}catch(err){res=await caches.match(r)}}return res?iso(res,true,u,sites):Response.error()}));return}
  if(cacheable(u)){e.respondWith(caches.match(u).then(m=>m||getCDN(u).then(res=>{const cl=res.clone();caches.open(C).then(c=>c.put(u,cl));return res})).then(res=>iso(res,false,u)))}});

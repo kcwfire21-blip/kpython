@@ -294,7 +294,7 @@ def _apply(src, new, msg, path=None, name="pasted.py"):
     if not d: print("No changes."); return
     print(d); print(msg)
     if path is None: return
-    if input("Apply and save? (y/n): ").strip().lower() == "y":
+    if input("Apply and save? (y/N): ").strip().lower() in ("y", "yes"):
         try:  # KPython: keep the old version in History first
             import r3_drop_history as _h, contextlib, io
             with contextlib.redirect_stdout(io.StringIO()): _h.save_version(os.path.relpath(path, SAFE_ROOT), "auto-save before refactor")
@@ -406,39 +406,22 @@ def main():
                 if os.path.getsize(p) > 500_000: raise ValueError("File over 500KB.")
                 _run(c, open(p, encoding="utf-8").read(), p, os.path.basename(p))
             elif c == "4":
-                k = input("Which refactor (1/2/3): ").strip()
+                k = input("Which refactor (1/2/3, blank = back): ").strip()
+                if k not in ("1", "2", "3"):
+                    if k: print("Pick 1, 2 or 3.")
+                    continue
                 print("Paste code, end with a single '.' line"); ls = []
                 while (l := input()) != ".": ls.append(l)
                 _run(k, "\n".join(ls) + "\n")
             elif c == "5": _self_test()
         except Exception as e: print("Error:", e)
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "explain", "gen_tests", "scan_code", "to_fstrings", "extract", "inline", "check"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     if "--test" in sys.argv: _self_test()

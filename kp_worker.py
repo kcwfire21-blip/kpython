@@ -85,11 +85,20 @@ builtins.input = _kp_input2
 
 def safe_path(p, base=HOME):
     """Shared KPython rule: resolve p and refuse anything outside /home/pyodide."""
-    full = os.path.realpath(os.path.join(base, str(p).strip()))
+    raw = os.path.normpath(os.path.join(base, str(p).strip()))
+    full = os.path.realpath(raw)
     if full != base and not full.startswith(base + '/'):
         raise ValueError(f"refused: {p} is outside {base}")
+    # v9 (Drop r7): refuse symlinks anywhere on the way, even ones that point inside ~
+    cur = base
+    for part in os.path.relpath(raw, base).split(os.sep) if raw != base else []:
+        if part in ('', '.'): continue
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            raise ValueError(f"refused: {p} goes through a symlink")
     return full
 builtins.kp_safe_path = safe_path
+_KP_SAFE_PATH = safe_path   # private copy; re-asserted before every run so a script can't swap it for later tools
 
 # ---- v5: round-3 team tools (security-patched copies in /home/pyodide/kptools) ----
 _KP_TOKEN = re.compile(r"(eyJ[\w-]+\.[\w-]+\.[\w-]*|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-[\w-]{16,}|AKIA[0-9A-Z]{16}|xox[abpr]-[\w-]{10,})")
@@ -246,7 +255,19 @@ class KPStopped(Exception):
     pass
 async def _kp_run_code(code, ns, filename):
     from pyodide.code import eval_code_async
+    builtins.kp_safe_path = _KP_SAFE_PATH   # v9: frozen shared path check
+    builtins.input = _kp_input3
     try:
         return await eval_code_async(code, globals=ns, filename=filename)
     except KeyboardInterrupt as e:
         raise KPStopped("KeyboardInterrupt: " + str(e)) from None
+
+# v9: remove a stray symlink left in ~ by the v8 log-analyzer self-test
+try:
+    _p = os.path.join(HOME, 'link.log')
+    if os.path.islink(_p): os.remove(_p)
+    import glob as _g, shutil as _sh
+    for _d in _g.glob(os.path.join(HOME, 'tmp*')):
+        if os.path.isdir(_d) and not os.path.islink(_d) and os.path.exists(os.path.join(_d, 'a.log')): _sh.rmtree(_d, ignore_errors=True)
+except Exception:
+    pass

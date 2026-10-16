@@ -14,7 +14,8 @@ def read_headers():
     print("Headers, one per line as Name: value. Blank line to finish.")
     h = {}
     while True:
-        line = input("  > ").strip()
+        try: line = input("  > ").strip()
+        except (KeyboardInterrupt, EOFError): return h
         if not line:
             return h
         if ":" in line:
@@ -27,7 +28,8 @@ def read_body():
     print("JSON body, multiple lines allowed. Type END on its own line to finish (or just END for none).")
     lines = []
     while True:
-        line = input()
+        try: line = input()
+        except (KeyboardInterrupt, EOFError): break
         if line.strip() == "END":
             break
         lines.append(line)
@@ -108,10 +110,11 @@ def send_xhr(method, url, headers, body):
     show(f"{x.status} {x.statusText}", hd, str(x.responseText), (time.perf_counter() - t) * 1000)
 
 def get_request():
-    m = input(f"Method {METHODS} [GET]: ").strip().upper() or "GET"
-    if m not in METHODS:
-        print("Unknown method, using GET.")
-        m = "GET"
+    while True:
+        m = input(f"Method {METHODS} [GET], q = quit: ").strip().upper() or "GET"
+        if m in ("Q", "QUIT"): return None
+        if m in METHODS: break
+        print("Pick one of", ", ".join(METHODS), "or q.")
     url = input("URL: ").strip()
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -124,14 +127,23 @@ def get_request():
 def main():
     print("=== Mini API Tester === (nothing is saved)")
     while True:
-        m, url, h, b = get_request()
+        r = get_request()
+        if r is None: break
+        m, url, h, b = r
         if IN_BROWSER:
             send_xhr(m, url, h, b)  # KPython: sync XHR in the worker, nothing stored
         else:
             send_sync(m, url, h, b)
         h.clear()  # drop headers (incl. any auth) right away
-        if input("\nAnother request? (y/N): ").strip().lower() != "y":
+        if input("\nAnother request? (y/N): ").strip().lower() not in ("y", "yes"):
             break
+
+
+# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+def self_test():
+    assert "hidden" in str(mask("Authorization", "Bearer abc")).lower() or "abc" not in str(mask("Authorization", "Bearer abc"))
+    assert mask("Accept", "json") is not None
+    print('self-tests passed')
 
 if __name__ == "__main__":
     main()

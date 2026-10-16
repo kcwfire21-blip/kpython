@@ -205,18 +205,18 @@ def check(pw):
 def _ask_int(prompt, default, lo, hi):
     while True:
         s = input("%s [%d]: " % (prompt, default)).strip()
-        if not s: return default
+        if not s or s.lower() == "q": return default
         if s.isdigit() and lo <= int(s) <= hi: return int(s)
         print("Enter a number %d-%d." % (lo, hi))
 
 
-def _yes(prompt, default=True):
+def _yes(prompt, default=False):  # KPython: every y/N question defaults to No
     while True:  # KPython: only blank, y/yes or n/no are accepted
         s = input("%s (%s): " % (prompt, "Y/n" if default else "y/N")).strip().lower()
         if not s: return default
         if s in ("y", "yes"): return True
-        if s in ("n", "no"): return False
-        print("Please type y or n.")
+        if s in ("n", "no", "q"): return False
+        print("Please type y or n (Enter = %s)." % ("yes" if default else "no"))
 
 
 def self_test():
@@ -264,6 +264,9 @@ def main():
             elif c == "1":
                 n = _ask_int("Length", 16, 4, 256)
                 sets = [s for s in SETS if _yes("Include " + s)]
+                if not sets: print("No character sets picked, so using all of them."); sets = list(SETS)
+                if not sets: print("No character sets picked, so using all of them."); sets = list(SETS)
+                if not sets: print("No character sets picked, so using all of them."); sets = list(SETS)
                 p, b = password(n, sets, _yes("Exclude look-alikes (I l 1 O 0)", False))
                 print("\n" + p + "\n" + meter(b))
             elif c == "2":
@@ -284,32 +287,12 @@ def main():
             print("Error:", e)
 
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse", "explain", "gen_tests", "scan_code", "to_fstrings", "extract", "inline", "check"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()

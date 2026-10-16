@@ -103,7 +103,8 @@ def read_code():
     print("Paste your solution, then a line with only END:")
     lines = []
     while True:
-        l = input()
+        try: l = input()
+        except (KeyboardInterrupt, EOFError): break
         if l.strip() == "END": break
         lines.append(l)
     return "\n".join(lines)
@@ -120,14 +121,14 @@ def main():
         if c == "q": break
         if c == "t": self_test(); continue
         if c == "r":
-            if input("Reset all progress? (y/n): ").lower() == "y":
+            if input("Reset all progress? (y/N): ").strip().lower() in ("y", "yes"):
                 prog = {}; save_progress(prog)
             continue
         if not c.isdigit() or not 1 <= int(c) <= len(KATAS): continue
         k = KATAS[int(c) - 1]
         print(f"\n{k[0]} ({k[1]}): {k[2]}\nStarter code:\n{stub(k)}")
         code = read_code()
-        if input("Run hidden tests on your code? (y/n): ").lower() != "y": continue
+        if input("Run hidden tests on your code? (y/N): ").strip().lower() not in ("y", "yes"): continue
         p, t, notes = run_tests(k, code)
         print(f"Passed {p}/{t}.")
         for n in notes: print(" ", n)
@@ -136,32 +137,12 @@ def main():
         else:
             print("Hint:", k[4])
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()

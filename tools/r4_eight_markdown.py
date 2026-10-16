@@ -31,7 +31,7 @@ def _inline(text):
                   lambda m: f'<img alt="{m.group(1)}" src="{_safe_url(html.unescape(m.group(2)))}">', text)
     text = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)",
                   lambda m: f'<a href="{_safe_url(html.unescape(m.group(2)))}" rel="noopener noreferrer">{m.group(1)}</a>', text)
-    text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
+    text = re.sub(r"\*\*(?=\S)(.+?)(?<=\S)\*\*|(?<![\w.])__(?=\S)(.+?)(?<=\S)__(?![\w_])", lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
     text = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)", r"<em>\1</em>", text)
     text = re.sub(r"~~(.+?)~~", r"<del>\1</del>", text)
     return re.sub(r"\x00(\d+)\x00", lambda m: codes[int(m.group(1))], text)
@@ -162,7 +162,7 @@ def convert_file(src, dest=None):
         result = to_html(f.read())
     if dest:
         out = _safe_path(dest)
-        if os.path.exists(out) and input(f"{out} exists. Overwrite? (y/N): ").strip().lower() != "y":
+        if os.path.exists(out) and input(f"{out} exists. Overwrite? (y/N): ").strip().lower() not in ("y", "yes"):
             print("Not saved.")
             return result
         with open(out, "w", encoding="utf-8") as f:
@@ -213,7 +213,7 @@ def main():
         while True:
             try:
                 ln = input()
-            except EOFError:
+            except (EOFError, KeyboardInterrupt):
                 break
             if ln == "END":
                 break
@@ -223,32 +223,12 @@ def main():
         print(f"Error: {e}")
 
 
-# --- KPython v5: size caps on text inputs (Drop's review) ---
-_KP_MAX = 500_000
-def _kp_cap(fn):
-    def w(*a, **k):
-        for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > _KP_MAX: raise ValueError("input too big (max 500 KB)")
-        return fn(*a, **k)
-    w.__wrapped__ = fn; return w
-for _n in ("format_code", "analyze", "check", "report", "pretty", "minify", "validate", "gen_dataclasses", "b64dec", "hexdec", "run_tests", "generate", "to_html", "cover", "profile_source", "scan_text", "convert", "parse"):
-    if callable(globals().get(_n)) and not isinstance(globals()[_n], type): globals()[_n] = _kp_cap(globals()[_n])
-if "Debugger" in globals():
-    _kp_dinit = Debugger.__init__
-    def _kp_dinit2(self, source, *a, **k):
-        if len(source) > _KP_MAX: raise ValueError("code too big to debug (max 500 KB)")
-        _kp_dinit(self, source, *a, **k)
-    Debugger.__init__ = _kp_dinit2
-
-# --- KPython v5 security wrapper: every path also goes through the app's shared kp_safe_path (/home/pyodide only) ---
-import builtins as _kp_b
-def _kp_wrap(fn):
-    def w(*a, **k):
-        r = fn(*a, **k)
-        return _kp_b.kp_safe_path(r) if hasattr(_kp_b, "kp_safe_path") and isinstance(r, str) and r.startswith("/") and all(globals().get(v, "/home/pyodide") == "/home/pyodide" for v in ("BASE", "BASE_DIR", "SAFE_ROOT")) else r
-    return w
-for _n in ("safe_path", "_safe_path", "_safe"):
-    if callable(globals().get(_n)): globals()[_n] = _kp_wrap(globals()[_n])
+# --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
+try:
+    from kp_common import harden as _kp_harden
+    _kp_harden(globals())
+except ImportError:  # running outside KPython
+    pass
 
 if __name__ == "__main__":
     main()
