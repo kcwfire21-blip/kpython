@@ -18,7 +18,10 @@ try{const cm=window.KP&&KP.cm&&KP.cm();if(cm)cm.getInputField().setAttribute('ar
 // input() rows: name the field after its prompt; toast is a status
 new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1)continue;
  const i=n.matches?.('.inrow')?n.querySelector('input'):null;if(i&&!i.getAttribute('aria-label')){const prev=(n.previousSibling&&n.previousSibling.textContent||'').trim().split('\n').pop();i.setAttribute('aria-label',prev?('Answer: '+prev.slice(-80)):'Answer for input()')}
- if(n.id==='toast'){n.setAttribute('role','status')}}}).observe(document.body,{subtree:true,childList:true});
+ if(n.id==='toast'){n.setAttribute('role','status')}}}).observe(document.body,{childList:true});
+['out','dv-out','r-out'].forEach(id=>{const e=document.getElementById(id);if(e)new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType===1&&n.matches?.('.inrow')){const i=n.querySelector('input');if(i&&!i.getAttribute('aria-label')){const prev=(n.previousSibling&&n.previousSibling.textContent||'').trim().split('\n').pop();i.setAttribute('aria-label',prev?('Answer: '+prev.slice(-80)):'Answer for input()')}}}}).observe(e,{childList:true})});
+// v10 (Get back L5): don't flood VoiceOver while a script prints; announce politely again when it stops
+const sb=document.getElementById('stopbtn');if(sb)new MutationObserver(()=>{const busy=!sb.hidden;['out','dv-out','r-out'].forEach(id=>{const e=document.getElementById(id);if(e)e.setAttribute('aria-live',busy?'off':'polite')})}).observe(sb,{attributes:true,attributeFilter:['hidden']});
 const t=document.getElementById('toast');if(t)t.setAttribute('role','status');
 // lock screen: focus the passcode and make the rest inert while locked
 const lock=document.getElementById('lock');if(lock){const upd=()=>{const on=!lock.hidden&&getComputedStyle(lock).display!=='none';['main','#top','#tabs'].forEach(s=>{const e=document.querySelector(s);if(e)e.inert=on});if(on&&pin)setTimeout(()=>pin.focus(),50)};upd();new MutationObserver(upd).observe(lock,{attributes:true,attributeFilter:['hidden','class','style']})}

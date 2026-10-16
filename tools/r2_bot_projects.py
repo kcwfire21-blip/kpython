@@ -1,4 +1,4 @@
-# Projects & zip: create multi-file projects in /home/pyodide/projects, run main.py, zip/unzip, and import a public GitHub repo as a zip (no login, stdlib only).
+# Projects & zip: create multi-file projects in /home/pyodide/projects, run main.py, zip/unzip, and import sys, a public GitHub repo as a zip (no login, stdlib only).
 import os, sys, io, zipfile, shutil, runpy
 
 ROOT = "/home/pyodide/projects"
@@ -132,22 +132,13 @@ def main():
                     if not d.startswith(os.path.realpath(ROOT) + os.sep): raise ValueError("refused: outside projects folder")
                     shutil.rmtree(d); print("Deleted.")
             elif c == "6": unzip(input("Zip file path: ").strip(), input("Project name (enter = zip name): ").strip() or None)
-            elif c == "7": import_github(input("owner/repo or URL: "), input("Branch/tag (enter = default): ").strip())
-            elif c: print("Pick 1-8 or q.")
-            elif c: print("Pick 1-8 or q.")
+            elif c == "7": print("GitHub import moved to Dev > ⬇️ GitHub import (a browser can't download GitHub zip files). It imports into ~/<repo>.")
             elif c: print("Pick 1-8 or q.")
         except Exception as e: print("Error:", e)
 
 
-# --- KPython v9: minimal self-test so Self-test all covers this tool ---
+# --- KPython v10: Dyno's full self-test (temp dir; names, new, tree, run, zip, unzip, zip-slip, downloaded-project guards) ---
 def self_test():
-    for name in ("../x", "/etc", "a/b"):
-        assert os.path.dirname(path(name)) == ROOT, path(name)  # names are reduced to a single folder under ROOT
-    for bad in ("", "..", "."):
-        try: path(bad); raise AssertionError("accepted " + repr(bad))
-        except ValueError: pass
-    assert isinstance(list_projects(), list)
-    print('self-tests passed')
+    import r8_dyno_projects_selftest as _st
+    return _st.self_test(sys.modules[__name__])
 
-if __name__ == "__main__":
-    main()

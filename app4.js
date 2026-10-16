@@ -81,7 +81,7 @@ document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.text
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
 // v9: Cancel on an input() prompt ends any tool cleanly ("Cancelled."), and a tool can never leave a tracer (debugger) running.
-function devWrap(code){return 'import sys as _kp_sys\ntry:\n'+code.split('\n').map(l=>'    '+l).join('\n')+'\nexcept (KeyboardInterrupt, EOFError) as _kp_e:\n    if isinstance(_kp_e, KeyboardInterrupt) and "input cancelled" not in str(_kp_e): raise\n    print("\\n⏹ Cancelled.")\nfinally:\n    _kp_sys.settrace(None)\n'}
+function devWrap(code){return 'import sys as _kp_sys, builtins as _kp_bi\n_kp_bi.kp_open_script = ('+JSON.stringify(cur||'')+', '+JSON.stringify(cm.getValue().slice(0,500000))+') if '+JSON.stringify(cur||'')+' else None\nfrom __main__ import _kp_nav_input as _kp_nav\n_kp_nav.inner, _kp_nav.n = _kp_bi.input, 0\n_kp_bi.input = _kp_nav\ntry:\n'+code.split('\n').map(l=>'    '+l).join('\n')+'\nexcept (KeyboardInterrupt, EOFError) as _kp_e:\n    if isinstance(_kp_e, KeyboardInterrupt) and not isinstance(_kp_e, KPBack) and "input cancelled" not in str(_kp_e): raise\n    print("\\n⏹ Cancelled.")\nfinally:\n    _kp_sys.settrace(None)\n    _kp_bi.input = _kp_nav.inner\n'}
 async function dev(label,code){kpJobNext='The Dev tool "'+label+'"';devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+devWrap(code),files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
@@ -126,7 +126,9 @@ const DEV={
  patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()'),
  help:()=>dev('❓ Help guide','import r6_eight_help as m\nm.main()'),
  tour:()=>dev('🧭 Getting-started tour','import r7_bot2_tour as m\nm.main()'),
- selftestall:()=>dev('🧪 Self-test all tools','import r7_dyno_selftest_all as m\nm.main()'),
+ selftestall:()=>dev('🧪 Self-test all tools','import r8_dyno_selftest_dev as m\nawait m.amain()'),
+ ghimport:()=>dev('⬇️ GitHub import','import r8_drop_ghimport as m\nawait m.amain()'),
+ examples:()=>dev('📘 Examples','import r8_bot2_examples as m\nm.main()'),
  cells:()=>dev('🧩 Cell runner (# %%)','import r6_dyno_cells as m\nm.main()'),
  time:()=>dev('🕒 Time & cron','import tzdata  # loads time-zone data in the browser\nimport r6_forlor_time as m\nm.main()'),
  audit:()=>dev('🛡 Dependency audit','import r6_getback_audit as m\nm.main()'),
@@ -224,7 +226,26 @@ $('bk-undo').onclick=()=>{let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]'
  for(let i=0;i<600&&$('lock')&&getComputedStyle($('lock')).display!=='none';i++)await new Promise(r=>setTimeout(r,500));
  if(LS.getItem('kp_toured')||running)return;LS.setItem('kp_toured','1');
  if(confirm('Welcome to KPython! Take the 1-minute getting-started tour?\n\n(You can open it any time from Dev › 🧭 Getting-started tour.)')){showView('v-dev');DEV.tour()}}catch(e){console.error(e)}})();
-// v9 perf: the games and the GitHub panel aren't needed for the first paint; load them once the page is idle
-(()=>{const load=()=>['games.js','github.js'].forEach(f=>{const s=document.createElement('script');s.src=f;document.body.appendChild(s)});
+// v10: cold-start progress bar for the Python download (the SW reports bytes; content-length is the compressed size, so it's an estimate)
+(()=>{if(!('serviceWorker'in navigator))return;const F={};let bar=null;
+ navigator.serviceWorker.addEventListener('message',e=>{const p=e.data&&e.data.kpProgress;if(!p)return;F[p.f]=p;
+  if(!bar){bar=document.createElement('progress');bar.id='pyprog';bar.max=1;bar.setAttribute('aria-label','Downloading Python');$('pystat').after(bar)}
+  const all=Object.values(F),got=all.reduce((a,x)=>a+x.got,0),tot=all.reduce((a,x)=>a+Math.max(x.total,x.got),0);bar.value=tot?got/tot:0;
+  bar.title=`Downloading Python: ${(got/1e6).toFixed(1)} MB`;if(all.every(x=>x.done)){setTimeout(()=>{bar&&bar.remove();bar=null},800)}})})();
+// v10: games + GitHub panel load once the page is idle, OR immediately on the first tap inside them (the tap is replayed, so there is no dead zone)
+(()=>{let P=null;const stamp=()=>{const t=document.getElementById('tpl-games');if(!t)return;t.replaceWith(t.content.cloneNode(true));
+  [['sn-c','Snake game board'],['g2-c','2048 game board']].forEach(([i,n])=>{const e=document.getElementById(i);if(e){e.setAttribute('role','img');e.setAttribute('aria-label',n)}});
+  document.querySelectorAll('.dpad button[data-d]').forEach(b=>b.setAttribute('aria-label',{u:'Up',l:'Left',d:'Down',r:'Right'}[b.dataset.d]))};
+ const load=()=>P||(stamp(),P=Promise.all(['games.js','github.js'].map(f=>new Promise(r=>{const s=document.createElement('script');s.src=f;s.onload=s.onerror=r;document.body.appendChild(s)}))));
+ window.kpLazy=load;window.kpLazyGames=load;const mine=el=>el&&el.closest&&el.closest('[id^="sn-"],[id^="g2-"],[id^="gh-"],[id^="t-sn"],[id^="t-g2"],[id^="t-gh"],.dpad');
+ document.addEventListener('click',e=>{if(window.KPG&&window.kpGhReady)return;const el=mine(e.target);if(!el||e.target.dataset.kpReplay)return;
+  e.preventDefault();e.stopImmediatePropagation();const t=e.target;load().then(()=>{t.dataset.kpReplay=1;t.click();delete t.dataset.kpReplay})},true);
  const go=()=>window.requestIdleCallback?requestIdleCallback(load,{timeout:2000}):setTimeout(load,300);
  if(document.readyState==='complete')go();else window.addEventListener('load',go)})();
+// v10: the Help guide in the app (static guide.html, generated from Eight's guide; no scripts inside)
+(()=>{const b=document.createElement('button');b.id='guide-btn';b.textContent='📖';b.title='How to use KPython';b.setAttribute('aria-label','How to use KPython (guide)');
+ const lk=$('pal-btn')||$('lockbtn');lk.parentNode.insertBefore(b,lk);
+ b.onclick=async()=>{let g=$('guide');if(!g){g=document.createElement('div');g.id='guide';g.setAttribute('role','dialog');g.setAttribute('aria-label','How to use KPython');g.hidden=true;
+  const x=document.createElement('button');x.className='pri';x.textContent='✕ Close guide';x.onclick=()=>{g.hidden=true};const body=document.createElement('div');
+  try{body.innerHTML=await (await fetch('guide.html')).text()}catch(e){body.textContent='Guide not available offline yet.'}
+  g.append(x,body);document.body.appendChild(g);window.addEventListener('kp-lock',()=>{g.hidden=true})}g.hidden=false;g.scrollTop=0;g.querySelector('button').focus()}})();

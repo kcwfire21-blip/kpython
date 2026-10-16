@@ -299,7 +299,11 @@ def main():
 # ---------------- self-tests (offline, mocked network) ----------------
 def run_self_tests():
     """Plain-python entry point (no event loop running)."""
-    return asyncio.run(self_tests_async())
+    try:
+        asyncio.get_running_loop()
+        return self_tests_async()          # KPython: inside the app the loop is running; the caller awaits this
+    except RuntimeError:
+        return asyncio.run(self_tests_async())
 
 
 async def self_tests_async():

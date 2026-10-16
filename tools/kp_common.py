@@ -66,21 +66,30 @@ def cap(fn, limit=MAX_TEXT):
     @functools.wraps(fn)
     def w(*a, **k):
         for x in list(a) + list(k.values()):
-            if isinstance(x, str) and len(x) > limit:
+            if isinstance(x, (str, bytes, bytearray)) and len(x) > limit:
+                raise ValueError(f"input too big (max {limit // 1000} KB)")
+            if isinstance(x, (list, tuple)) and (len(x) > limit // 10 or sum(len(i) for i in x if isinstance(i, (str, bytes))) > limit):
                 raise ValueError(f"input too big (max {limit // 1000} KB)")
         return fn(*a, **k)
     return w
 
 def _check(p):
     sp = getattr(builtins, "kp_safe_path", None)
-    return sp(p) if sp else p
+    if sp is None:
+        import sys
+        if sys.platform == "emscripten":   # v10 (Get back L2): inside the app a missing guard is an error, not a pass
+            raise ValueError("path check unavailable (kp_safe_path missing); refusing")
+        return p
+    return sp(p)
 
 def guard_path(fn, g):
     @functools.wraps(fn)
     def w(*a, **k):
         home_based = all(g.get(v, HOME) == HOME for v in BASE_VARS)
-        if home_based and a and isinstance(a[0], str) and a[0].strip():
-            _check(a[0])                  # refuse ../, outside ~ and symlinks before the tool touches the path
+        first = next((x for x in a if isinstance(x, str)), None)
+        if first is None: first = next((k[n] for n in ("path", "p", "name", "rel") if isinstance(k.get(n), str)), None)
+        if home_based and first and first.strip():
+            _check(first)                  # refuse ../, outside ~ and symlinks before the tool touches the path
         r = fn(*a, **k)
         if home_based and isinstance(r, str) and r.startswith("/"):
             r = _check(r)                 # and the resolved result too

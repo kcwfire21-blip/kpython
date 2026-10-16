@@ -167,24 +167,6 @@ def _pick(n):
         if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
         print(f"Enter a number 1-{n}.")
 
-def _pick(n):
-    """KPython: 1-based request number; 0, negatives, junk and blank never pick a request."""
-    if not n: print("No saved requests yet."); return None
-    while True:
-        s = input(f"Number (1-{n}, blank = back): ").strip().lower()
-        if not s or s == "q": return None
-        if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
-        print(f"Enter a number 1-{n}.")
-
-def _pick(n):
-    """KPython: 1-based request number; 0, negatives, junk and blank never pick a request."""
-    if not n: print("No saved requests yet."); return None
-    while True:
-        s = input(f"Number (1-{n}, blank = back): ").strip().lower()
-        if not s or s == "q": return None
-        if s.isdigit() and 1 <= int(s) <= n: return int(s) - 1
-        print(f"Enter a number 1-{n}.")
-
 def main():
     data = load()
     while True:

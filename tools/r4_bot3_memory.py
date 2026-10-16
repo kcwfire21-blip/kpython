@@ -105,7 +105,7 @@ def self_test():
         pass
     try:
         safe_path("../../etc/passwd"); assert False
-    except PermissionError:
+    except (PermissionError, ValueError):
         pass
     assert not tracemalloc.is_tracing()
     print("All self-tests passed.")

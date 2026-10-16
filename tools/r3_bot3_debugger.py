@@ -183,7 +183,7 @@ def self_test():
     # path safety
     try:
         safe_path("../../etc/passwd"); assert False
-    except PermissionError:
+    except (PermissionError, ValueError):
         pass
     assert sys.gettrace() is None
     print("All self-tests passed.")

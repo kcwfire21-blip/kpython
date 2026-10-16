@@ -120,7 +120,7 @@ def one(): pass
     assert new.count("Already documented.") == 1
     assert "Returns" not in new.split("async def fetch")[1]
     try: _safe("/etc/passwd"); raise AssertionError("path guard failed")
-    except PermissionError: pass
+    except (PermissionError, ValueError): pass
     print("self-tests passed")
 
 def main():

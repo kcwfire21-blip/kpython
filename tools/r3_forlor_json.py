@@ -156,7 +156,7 @@ def self_test():
     try:
         _safe("../etc/passwd")
         raise AssertionError("path escape allowed")
-    except PermissionError:
+    except (PermissionError, ValueError):
         pass
     print("All self-tests passed.")
 

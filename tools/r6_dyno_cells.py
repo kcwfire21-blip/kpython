@@ -223,13 +223,23 @@ def self_test():
 
 def main():
     print("== Cell Runner ==")
-    p = input("Script path under " + BASE + " (t = self-test): ").strip()
+    import builtins, re as _re
+    cur = getattr(builtins, "kp_open_script", None)
+    hint = f" (Enter = the open script \"{cur[0]}\")" if cur else ""
+    p = input("Script path under " + BASE + hint + ", t = self-test: ").strip()
     if p == "t":
         self_test(); return
     try:
-        path = kp_safe_path(p)
-        if not path.endswith(".py") or not os.path.isfile(path):
-            raise ValueError("Not a .py file.")
+        if not p and cur:   # KPython: work on a copy of the script open in the editor
+            d = kp_safe_path(".kp_cells"); os.makedirs(d, exist_ok=True)
+            path = os.path.join(d, (_re.sub(r"\W+", "_", cur[0]).strip("_") or "script") + ".py")
+            with open(path, "w", encoding="utf-8") as f: f.write(cur[1])
+            print(f"Using a copy of \"{cur[0]}\" ({path}); 'w' in edit mode writes the copy, not the saved script.")
+        else:
+            if not p: raise ValueError("Type a file path (no script is open).")
+            path = kp_safe_path(p)
+            if not os.path.exists(path): raise ValueError(f"No file called {p} under {BASE}.")
+            if not path.endswith(".py") or not os.path.isfile(path): raise ValueError(f"{p} is not a .py file.")
         if os.path.getsize(path) > MAX_BYTES:
             raise ValueError("File over 500KB.")
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -267,7 +277,7 @@ def main():
                 idxs = [n - 1]
         except ValueError:
             print(f"Pick 1-{len(cells)}, a, u N, r or q."); continue
-        if input(f"Run {len(idxs)} cell(s)? (y/N): ").strip().lower() not in ("y", "yes"):
+        if len(idxs) > 1 and input(f"Run {len(idxs)} cell(s)? (y/N): ").strip().lower() not in ("y", "yes"):
             print("Cancelled."); continue
         show(run_range(cells, ns, idxs))
 

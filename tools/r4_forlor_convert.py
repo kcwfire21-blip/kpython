@@ -152,7 +152,8 @@ def ask_fmt(prompt, default=None):
     while True:
         f = (input(f"{prompt} {FORMATS}" + (f" [{default}]" if default else "") + ", q = cancel: ").strip().lower() or default or "")
         if f in ("", "q", "quit"):
-            raise KeyboardInterrupt("input cancelled")
+            import builtins
+            raise getattr(builtins, "KPBack", ValueError)()   # KPython: back to the menu, not a tool exit
         if f in FORMATS:
             return f
         print("  Pick one of", FORMATS)
@@ -207,7 +208,7 @@ def self_test():
         pass
     try:
         _safe("../../etc/passwd"); raise AssertionError("path escape")
-    except PermissionError:
+    except (PermissionError, ValueError):
         pass
     print("All self-tests passed.")
 

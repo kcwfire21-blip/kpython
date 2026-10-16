@@ -1,4 +1,6 @@
-:root{--bg:#0d1117;--card:#161b22;--line:#30363d;--fg:#e6edf3;--mut:#8b949e;--acc:#3776ab;--acc2:#ffd43b;--ok:#3fb950;--bad:#f85149}
+:root,:root[data-theme=dark]{--bg:#0d1117;--card:#161b22;--ctl:#21262d;--sunk:#010409;--line:#30363d;--fg:#e6edf3;--mut:#8b949e;--acc:#2f6a9e;--accline:#4b8bc4;--onacc:#ffffff;--acc2:#ffd43b;--ok:#3fb950;--bad:#f85149;--err:#ff7b72;--echo:#79c0ff;--warn:#e3b341;--dangerbg:#3d1214;--dangerfg:#ffb3ae;--toastbg:#1f7a32;--toastfg:#ffffff;--wk:#0d2238;--field:#6e7681;--focus:#ffd43b;--cmbg:#282a36;--cmgut:#282a36;--cmnum:#8b9bb4;--cmfg:#f8f8f2;--cmcursor:#f8f8f0;--cmsel:#2f3140;--kw:#ff79c6;--str:#f1fa8c;--num:#bd93f9;--com:#9ba4d0;--dfn:#50fa7b;--bi:#8be9fd;--var2:#ffb86c;--meta:#f1fa8c;--prop:#66d9ef;--tabsbg:#0d1117;color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#ffffff;--card:#f6f8fa;--ctl:#eaeef2;--sunk:#f6f8fa;--line:#d0d7de;--fg:#1f2328;--mut:#59636e;--acc:#0b5cad;--accline:#0a4f94;--onacc:#ffffff;--acc2:#7d4e00;--ok:#116329;--bad:#cf222e;--err:#b31d28;--echo:#0550ae;--warn:#7d4e00;--dangerbg:#ffebe9;--dangerfg:#a40e26;--toastbg:#1a7f37;--toastfg:#ffffff;--wk:#ddf4ff;--field:#6e7781;--focus:#0b5cad;--cmbg:#ffffff;--cmgut:#f6f8fa;--cmnum:#59636e;--cmfg:#1f2328;--cmcursor:#1f2328;--cmsel:#ddeeff;--kw:#cf222e;--str:#0a3069;--num:#0550ae;--com:#57606a;--dfn:#6639ba;--bi:#953800;--var2:#116329;--meta:#6639ba;--prop:#0550ae;--tabsbg:#ffffff;color-scheme:light}}
+:root[data-theme=light]{--bg:#ffffff;--card:#f6f8fa;--ctl:#eaeef2;--sunk:#f6f8fa;--line:#d0d7de;--fg:#1f2328;--mut:#59636e;--acc:#0b5cad;--accline:#0a4f94;--onacc:#ffffff;--acc2:#7d4e00;--ok:#116329;--bad:#cf222e;--err:#b31d28;--echo:#0550ae;--warn:#7d4e00;--dangerbg:#ffebe9;--dangerfg:#a40e26;--toastbg:#1a7f37;--toastfg:#ffffff;--wk:#ddf4ff;--field:#6e7781;--focus:#0b5cad;--cmbg:#ffffff;--cmgut:#f6f8fa;--cmnum:#59636e;--cmfg:#1f2328;--cmcursor:#1f2328;--cmsel:#ddeeff;--kw:#cf222e;--str:#0a3069;--num:#0550ae;--com:#57606a;--dfn:#6639ba;--bi:#953800;--var2:#116329;--meta:#6639ba;--prop:#0550ae;--tabsbg:#ffffff;color-scheme:light}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:16px -apple-system,system-ui,sans-serif}
 body{padding:env(safe-area-inset-top) 10px calc(76px + env(safe-area-inset-bottom))}
@@ -72,7 +74,6 @@ details.devgrp>summary{cursor:pointer;font-weight:600;padding:4px 0;list-style:n
 .pal-box{background:var(--card,#1e1f29);border-radius:14px;width:100%;max-width:520px;padding:10px;box-shadow:0 10px 40px #000a}#pal-in{width:100%;font-size:17px;box-sizing:border-box}
 #pal-list{list-style:none;margin:8px 0 0;padding:0;max-height:55vh;overflow:auto}#pal-list li{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:8px;cursor:pointer}#pal-list li.on{background:var(--acc,#3b82f6)}#pal-list li small{opacity:.7}#pal-list li.none{opacity:.6;cursor:default}
 /* ---- v9 accessibility (bot2help r7) ---- */
-:root{--acc:#2f6a9e;color-scheme:dark}
 .pri,.chips button.on,.etools button.on,#pal-list li.on{color:#fff}
 .inrow input,#r-in,#tu-code,#gh-file,#pal-in,#st-in,input,select,textarea{font-size:16px!important}
 .CodeMirror textarea{font-size:16px!important}
@@ -88,3 +89,49 @@ input,select,textarea{border-color:#6e7681}
 .hint,label{font-size:14px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 #updbar{position:fixed;left:12px;right:12px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:150;min-height:48px}
+
+/* ---- v10 light/dark theme (bot2help r8) ---- */
+button,select,input,textarea,.pill{background:var(--ctl)}
+input,select,textarea{border-color:var(--field)}
+.pri,.chips button.on{border-color:var(--accline)}
+.pri,.chips button.on,.etools button.on,#pal-list li.on,li.CodeMirror-hint-active{color:var(--onacc)}
+.danger{background:var(--dangerbg);color:var(--dangerfg)}
+#out,.inv,.console,#tu-code,#gh-file,canvas#sn-c,canvas#g2-c,canvas#tu-c{background:var(--sunk)}
+.err,.console .err,a.tb{color:var(--err)}.console .echo{color:var(--echo)}#out .ehint,.console .ehint{color:var(--warn)}
+.wk{background:var(--wk)}
+#tabs{background:var(--tabsbg);background:color-mix(in srgb,var(--tabsbg) 96%,transparent)}
+.CodeMirror-hints{background:var(--card)}
+#toast{background:var(--toastbg);color:var(--toastfg)}
+.errline{background:color-mix(in srgb,var(--bad) 28%,transparent)!important}
+:focus-visible{outline-color:var(--focus)}.CodeMirror-focused{box-shadow:0 0 0 3px var(--focus)}
+.pal-box{background:var(--card)}#pal-list li.on{background:var(--acc)}
+#dv-md{border-color:var(--line)!important;background:var(--bg)!important}
+.CodeMirror.cm-s-dracula,.cm-s-dracula.CodeMirror{background:var(--cmbg)!important;color:var(--cmfg)!important}
+.cm-s-dracula .CodeMirror-gutters{background:var(--cmgut)!important;border-right:1px solid var(--line)}
+.cm-s-dracula .CodeMirror-linenumber{color:var(--cmnum)}
+.cm-s-dracula .CodeMirror-cursor{border-left:2px solid var(--cmcursor)}
+.cm-s-dracula .CodeMirror-selected,.cm-s-dracula.CodeMirror-focused .CodeMirror-selected{background:var(--cmsel)!important}
+.cm-s-dracula .CodeMirror-line::selection,.cm-s-dracula .CodeMirror-line>span::selection,.cm-s-dracula .CodeMirror-line>span>span::selection{background:var(--cmsel)}
+.cm-s-dracula .CodeMirror-activeline-background{background:var(--cmsel)}
+.cm-s-dracula span.cm-keyword,.cm-s-dracula span.cm-operator{color:var(--kw)}
+.cm-s-dracula span.cm-string,.cm-s-dracula span.cm-string-2{color:var(--str)}
+.cm-s-dracula span.cm-number,.cm-s-dracula span.cm-atom{color:var(--num)}
+.cm-s-dracula span.cm-comment{color:var(--com)}
+.cm-s-dracula span.cm-def{color:var(--dfn)}
+.cm-s-dracula span.cm-builtin{color:var(--bi)}
+.cm-s-dracula span.cm-variable{color:var(--cmfg)}
+.cm-s-dracula span.cm-variable-2{color:var(--var2)}
+.cm-s-dracula span.cm-meta{color:var(--meta)}
+.cm-s-dracula span.cm-property{color:var(--prop)}
+.cm-s-dracula span.cm-punctuation,.cm-s-dracula span.cm-bracket{color:var(--cmfg)}
+.cm-s-dracula span.cm-error{background:var(--bad);color:var(--onacc)}
+.cm-s-dracula .CodeMirror-matchingbracket{color:var(--ok)!important;outline:1px solid var(--ok);text-decoration:none}
+.cm-s-dracula .CodeMirror-nonmatchingbracket{color:var(--bad)!important}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#theme-sel{width:auto}
+#pyprog{width:90px;height:8px;vertical-align:middle;margin-left:6px;accent-color:var(--acc)}
+#diffsheet{position:fixed;inset:0;z-index:300;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;border:3px solid var(--acc)}#diffsheet pre{flex:1;overflow:auto;background:var(--sunk);padding:8px;font-size:13px;white-space:pre-wrap;word-break:break-all;margin:0}
+#guide{position:fixed;inset:0;z-index:250;background:var(--bg);overflow:auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}#guide code{color:var(--acc2)}
+/* v10: keep the header inside a 375-390px iPhone width now that it has theme + guide buttons */
+#top{gap:6px;flex-wrap:wrap;row-gap:6px}#top>*{flex-shrink:0}#top h1{white-space:nowrap}#pystat,#offstat{font-size:12px}
+@media (max-width:430px){#top button,#top select{min-width:40px;padding-left:6px;padding-right:6px}#theme-sel{max-width:52px}#top h1{font-size:17px}}

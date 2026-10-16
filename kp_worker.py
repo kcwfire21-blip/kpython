@@ -25,6 +25,8 @@ def _kp_write_modules(files_json):
 _kp_repl_ns = {'__name__': '__console__', '__builtins__': __builtins__}
 _kp_console = code.InteractiveConsole(_kp_repl_ns, filename='<console>')
 def _kp_repl_push(line):
+    try: _kp_reassert()   # v10: the REPL path re-asserts the shared path check too
+    except NameError: pass
     return bool(_kp_console.push(line))
 def _kp_repl_reset():
     global _kp_console
@@ -257,14 +259,29 @@ except Exception:
 # "Uncaught (in promise)" error in the console. Converting it here keeps the same message for the app.
 class KPStopped(Exception):
     pass
-async def _kp_run_code(code, ns, filename):
-    from pyodide.code import eval_code_async
-    builtins.kp_safe_path = _KP_SAFE_PATH   # v9: frozen shared path check
-    builtins.input = _kp_input3
-    try:
-        return await eval_code_async(code, globals=ns, filename=filename)
-    except KeyboardInterrupt as e:
-        raise KPStopped("KeyboardInterrupt: " + str(e)) from None
+def _kp_make_runner(_sp=safe_path, _inp=_kp_input3):
+    # v10 (Get back L1): the private copies live in this closure, not in a __main__ global a script could reassign.
+    # Note: kp_safe_path is a guard against mistakes, not a sandbox; code in the same interpreter can always get around it.
+    import asyncio
+    async def _kp_run_code(code, ns, filename):
+        from pyodide.code import eval_code_async
+        builtins.kp_safe_path = _sp
+        builtins.input = _inp
+        before = set(asyncio.all_tasks())
+        try:
+            return await eval_code_async(code, globals=ns, filename=filename)
+        except KeyboardInterrupt as e:
+            raise KPStopped("KeyboardInterrupt: " + str(e)) from None
+        finally:
+            # v10 (Get back M2): background tasks a run left behind are cancelled, so they can't act inside a later run
+            left = [t for t in asyncio.all_tasks() if t not in before and t is not asyncio.current_task() and not t.done()]
+            for t in left: t.cancel()
+            if left: print(f"(stopped {len(left)} background task(s) this run left running)")
+    def reassert():
+        builtins.kp_safe_path = _sp
+    return _kp_run_code, reassert
+_kp_run_code, _kp_reassert = _kp_make_runner()
+del _KP_SAFE_PATH
 
 # v9: remove a stray symlink left in ~ by the v8 log-analyzer self-test
 try:
@@ -275,3 +292,36 @@ try:
         if os.path.isdir(_d) and not os.path.islink(_d) and os.path.exists(os.path.join(_d, 'a.log')): _sh.rmtree(_d, ignore_errors=True)
 except Exception:
     pass
+
+# v10: Cancel = back one level in Dev tools. A cancelled input() raises KPBack, which is BOTH an Exception and a
+# KeyboardInterrupt, so the nearest handler in the tool (its menu loop's `except Exception`, or a local Cancel handler)
+# takes it and the tool goes back one level. Two Cancels in a row with no answer in between end the tool.
+class KPBack(Exception, KeyboardInterrupt):
+    def __str__(self): return "↩ cancelled, back to the menu"
+builtins.KPBack = KPBack
+def _kp_nav_input(prompt=""):
+    try:
+        v = _kp_nav_input.inner(prompt)
+    except KeyboardInterrupt as e:
+        if isinstance(e, KPBack) or "input cancelled" not in str(e): raise
+        _kp_nav_input.n += 1
+        if _kp_nav_input.n >= 2:
+            _kp_nav_input.n = 0; raise KeyboardInterrupt("input cancelled")
+        raise KPBack()
+    _kp_nav_input.n = 0
+    return v
+_kp_nav_input.n = 0
+
+# v10: temp files go under ~ (cleaned at start) so tools' temp folders pass the shared path check
+try:
+    import tempfile as _tf, shutil as _sh2
+    _TMP = os.path.join(HOME, '.kp_tmp'); _sh2.rmtree(_TMP, ignore_errors=True); os.makedirs(_TMP, exist_ok=True)
+    _tf.tempdir = _TMP
+except Exception:
+    pass
+
+async def kp_request_site(origin, why=""):
+    """v10: ASK the app to add a site to Allowed sites. Keivon confirms in the app (same rules as Tools > Allowed sites).
+    Returns True if added; it applies after Python restarts (the app does that when the run ends)."""
+    return bool(await js.kpSiteAsk(str(origin)[:200], str(why)[:120]))
+builtins.kp_request_site = kp_request_site

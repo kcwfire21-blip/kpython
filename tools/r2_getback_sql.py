@@ -127,8 +127,8 @@ def self_test():
     with contextlib.redirect_stdout(io.StringIO()) as o:
         tables(con); schema(con, "t")
     assert "t" in o.getvalue(), o.getvalue()
-    for bad in ("../x", "/etc/passwd"):
-        try: safe_path(bad, ".db"); raise AssertionError("escape")
+    for bad in ("../x", "/etc/passwd"):   # names are reduced to a bare file name inside HOME
+        try: p = safe_path(bad, ".db"); assert p.startswith(HOME + os.sep) and "/" not in p[len(HOME) + 1:], "escape"
         except (ValueError, PermissionError): pass
     print('self-tests passed')
 

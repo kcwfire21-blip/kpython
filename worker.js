@@ -24,6 +24,7 @@ self.prompt=function(p){p=String(p??'');
 let PK=[];self.kpPkgsGet=()=>JSON.stringify(PK);self.kpPkgsSet=j=>{PK=JSON.parse(j);post('pkgs',{l:PK})};
 let SITES=[],CUR=0;
 // v7 saved-scripts bridge: Python can READ saved scripts, and can only ASK the page to change one; the page confirms with Keivon first.
+self.kpSiteAsk=(o,why)=>sbr('siteask',{o:String(o),why:String(why||'')});
 const SBR={};function sbr(t,o){return new Promise(r=>{const id=crypto.randomUUID();SBR[id]=r;post(t,Object.assign({id,job:CUR},o))})}
 self.kpScriptsGet=(names)=>sbr('sget',names?{names:Array.from(names,String)}:{});self.kpScriptsSet=(name,text,why)=>sbr('sset',{name:String(name),text:String(text),why:String(why||'').slice(0,200)});
 self.kpSitesGet=()=>JSON.stringify(SITES);
@@ -36,8 +37,12 @@ async function init(m){PK=m.pkgs||[];SITES=Array.isArray(m.sites)?m.sites.map(St
  // persist /home/pyodide in IndexedDB so files (projects, SQLite dbs, CSVs) survive restarts
  try{py.FS.mkdirTree('/home/pyodide');py.FS.mount(py.FS.filesystems.IDBFS,{},'/home/pyodide');await new Promise(r=>py.FS.syncfs(true,r))}catch(err){post('out',{s:'File persistence off: '+err,c:'sys'})}
  await py.runPythonAsync(m.setup);await py.runPythonAsync(m.wsetup);
-  for(const p of (m.pkgs||[])){try{if(m.native.includes(p.toLowerCase()))await py.loadPackage(p.toLowerCase());else{await py.loadPackage('micropip');await py.pyimport('micropip').install(p)}}catch(err){post('out',{s:'Reinstall '+p+' failed (offline?)',c:'sys'})}}
  post('ready',{v:py.version,sab:useSAB,units:py.runPython('list(UNITS)').toJs()});
+ // r8 perf (bot3): saved packages reinstall in parallel AFTER ready; prep() waits for them
+ PKGP=(async()=>{const L=(m.pkgs||[]).map(String),nat=L.filter(p=>m.native.includes(p.toLowerCase())).map(p=>p.toLowerCase()),pip=L.filter(p=>!m.native.includes(p.toLowerCase()));
+  const fail=p=>post('out',{s:'Reinstall '+p+' failed (offline?)',c:'sys'});
+  await Promise.all([nat.length?py.loadPackage(nat).catch(()=>fail(nat.join(', '))):null,
+   pip.length?py.loadPackage('micropip').then(()=>py.pyimport('micropip').install(pip)).catch(()=>fail(pip.join(', '))):null])})();
  // v9 perf: Dev tools load in parallel after ready (runs wait for them, see TOOLSP)
  // v9.1 (Get back M1): tools live in /kptools on MEMFS (not the persistent ~), read-only, and only files the SW verified against its hash manifest are written.
  TOOLSP=(async()=>{const bad=[];try{try{py.FS.mkdirTree('/kptools')}catch(e){}
@@ -45,13 +50,15 @@ async function init(m){PK=m.pkgs||[];SITES=Array.isArray(m.sites)?m.sites.map(St
   const res=await Promise.allSettled(m.tools.map(async f=>{let t;try{t=await get(f)}catch(e){t=await get(f)}py.FS.writeFile('/kptools/'+f,t);py.FS.chmod('/kptools/'+f,0o444)}));
   res.forEach((r,i)=>{if(r.status==='rejected')bad.push(m.tools[i])});py.FS.chmod('/kptools',0o555)}catch(err){bad.push(String(err))}
   if(bad.length)post('out',{s:'⚠️ Dev tools not loaded (missing or failed the integrity check): '+bad.join(', '),c:'err'})})()}
-let TOOLSP=null;
-async function prep(code){try{await py.loadPackagesFromImports(code,{messageCallback:s=>post('out',{s,c:'sys'})})}catch(e){post('out',{s:'Package load: '+e.message,c:'err'})}
+let TOOLSP=null,PKGP=null;
+async function prep(code){if(PKGP)await PKGP;
+ if(/\bsqlite3\b|r2_getback_sql|selftest|r8_bot2_examples/.test(code)){try{await py.loadPackage('sqlite3')}catch(e){}}  // v10: Dev tools and self-tests need sqlite3
+ try{await py.loadPackagesFromImports(code,{messageCallback:s=>post('out',{s,c:'sys'})})}catch(e){post('out',{s:'Package load: '+e.message,c:'err'})}
  if(/\bmatplotlib\b/.test(code)){await py.runPythonAsync('import matplotlib');py.globals.get('_kp_mpl_patch')()}}
 const clean=t=>{const o=[];let skip=false;for(const l of t.split('\n')){if(/^  File "/.test(l))skip=/\/lib\/python3\d+\.zip\/_pyodide\//.test(l)||/, in _kp_run_code$/.test(l);else if(!/^\s/.test(l))skip=false;if(!skip)o.push(l)}return o.join('\n')};
 const errMsg=e=>{const m=clean(String(e.message||e).trim());return /KeyboardInterrupt/.test(m)?(/input cancelled/.test(m)?'⏹ Stopped (input cancelled)':'⏹ KeyboardInterrupt: stopped'):m};
 let syncT=0;const persist=()=>{clearTimeout(syncT);syncT=setTimeout(()=>{try{py.FS.syncfs(false,()=>{})}catch(_){}},300)};
-onmessage=async e=>{const m=e.data;if(m.cmd==='sres'){const r=SBR[m.id];delete SBR[m.id];if(r)r(m.v);return}if(m.cmd==='init')return init(m).catch(err=>post('fail',{s:String(err)}));CUR=m.id;if(TOOLSP)await TOOLSP;
+onmessage=async e=>{const m=e.data;if(m.cmd==='pkgsync'){PK=Array.isArray(m.l)?m.l.map(String):PK;return}if(m.cmd==='sres'){const r=SBR[m.id];delete SBR[m.id];if(r)r(m.v);return}if(m.cmd==='init')return init(m).catch(err=>post('fail',{s:String(err)}));CUR=m.id;if(TOOLSP)await TOOLSP;
  const done=(x)=>{try{py.runPython('import sys;sys.stdout.flush();sys.stderr.flush()')}catch(_){}post('done',{id:m.id,...x});persist()};
  if(intr)intr[0]=0;
  try{

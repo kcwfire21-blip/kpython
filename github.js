@@ -33,4 +33,4 @@ $('gh-push').onclick=async()=>{try{if(!token)throw new Error('Log in first');con
  const body={message:`Edit ${p} from KPython`,content:b64e($('gh-file').value),branch:br};if(sha&&p===curFile)body.sha=sha;
  const d=await gh(`/repos/${r}/contents/${enc(p)}`,{method:'PUT',body:JSON.stringify(body)});sha=d.content.sha;curFile=p;msg('✅ Pushed '+p+' ('+d.commit.sha.slice(0,7)+')')}
  catch(e){msg('Push failed: '+e.message)}};
-setStatus();})();
+setStatus();window.kpGhReady=true;})();

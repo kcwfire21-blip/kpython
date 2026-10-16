@@ -1,0 +1,86 @@
+<!-- generated from contrib/r8_eight_guide.md (Eight); static content, no scripts -->
+<h2>How to use KPython on iPhone</h2>
+<p>KPython runs Python right on your phone (Pyodide). Your code isn't uploaded anywhere.</p>
+<h3>1. Install</h3>
+<ul>
+<li>Open the KPython page in <strong>Safari</strong>.</li>
+<li>Tap the Share button, then <strong>Add to Home Screen</strong>. It opens full screen like a normal app, with the KPython icon.</li>
+<li>The first time you open it, it asks you to <strong>create a passcode (4+ characters)</strong>. Tap <strong>Unlock</strong>. Tap 🔒 to lock it again.</li>
+<li>The passcode only hides the screen. It does <strong>not</strong> encrypt anything.</li>
+</ul>
+<p><strong>Offline:</strong> after one load with internet, the app saves its own files plus Python, so it works without a signal. Packages you've loaded are saved for offline use too. When an update is ready, the app saves your editor and shows a bar to <strong>tap to reload</strong>. It never reloads by itself.</p>
+<h3>2. Your first script</h3>
+<ul>
+<li>Go to the <strong>⌨️ Code</strong> tab and wait until the button changes from "Loading Python…" to <strong>▶ Run</strong>.</li>
+<li>Tap <strong>＋</strong> for a new script, or <strong>📚</strong> to start from a snippet.</li>
+<li>Type <code>print("Hello, Keivon")</code> and tap <strong>▶ Run</strong>. The output shows up below.</li>
+<li><code>input()</code> works: the app asks you for the answer.</li>
+<li>Stuck in a loop? Tap <strong>⏹ Stop</strong>.</li>
+<li>Your edits save automatically. <strong>💾</strong> saves now.</li>
+<li>The <strong>&gt;_ REPL</strong> tab is a Python console for quick one-line tests. Try <code>help(str.split)</code>.</li>
+<li>To add packages, type a name and tap <strong>Install</strong>, or tap <strong>numpy</strong>, <strong>pandas</strong> or <strong>matplotlib</strong>.</li>
+</ul>
+<h3>3. Files</h3>
+<p>On the <strong>📁 Files</strong> tab you'll see <strong>My Scripts</strong>, with these buttons:</p>
+<ul>
+<li><strong>＋ New</strong> makes a new script.</li>
+<li><strong>📥 Import .py</strong> brings in a script from the iPhone Files app.</li>
+<li><strong>📤 Export this file</strong> (in the Code tab) exports one script. It's <strong>not</strong> a backup.</li>
+</ul>
+<h3>4. Dev tools</h3>
+<p>The <strong>🛠 Dev</strong> tab works on the script that's open. Some useful ones:</p>
+<ul>
+<li><strong>🧹 Lint</strong> finds mistakes <strong>without running</strong> your code.</li>
+<li><strong>✨ Format</strong> tidies your code. <strong>📝 Docstrings</strong> adds descriptions to your functions. Both show you the changes first and ask before applying them. Undo with ↶.</li>
+<li><strong>✅ Run tests</strong>, <strong>⏱ Profile</strong>, <strong>🐞 Debug</strong>, <strong>🧪 Coverage</strong> and <strong>🧠 Memory</strong> <strong>run your code</strong>, so they ask first.</li>
+<li><strong>🕘 Save version</strong> saves a copy of your script. <strong>📜 History</strong> lets you compare versions or go back to an old one.</li>
+<li><strong>🔑 Secret scan</strong> finds passwords or tokens left in your scripts.</li>
+<li><strong>🧰 Tools ▸ 🛠 More</strong> has team scripts (Dev tools, Terminal, Job tracker, GitHub browser, Loan calc, Rent check). Tapping a button <strong>runs that script right away</strong> in the Code tab.</li>
+</ul>
+<p><strong>Safety tip:</strong> in <strong>⌨️ Terminal</strong>, <code>python &lt;file&gt;</code> and <code>pip install</code> <strong>ask you first</strong> (type y). Only run files you wrote or trust. Check package names carefully, or use Dev ▸ <strong>📦 Packages</strong>, which confirms first.</p>
+<h3>5. GitHub push safety</h3>
+<p>Use <strong>🧰 Tools ▸ 🐙 GitHub</strong>.</p>
+<ul>
+<li>You can read public repos without logging in. Enter owner/repo and tap <strong>Open</strong>.</li>
+<li><strong>Logging in</strong> (for private repos and pushing): use a <strong>fine-grained token</strong> limited to just the repos you need, with only "Contents: Read and write" and a 30-day expiry. Never use a classic token.</li>
+<li>The token stays in memory only. It's wiped when you lock the app, reload, or log out.</li>
+<li>Python scripts can't read it.</li>
+<li><strong>⬆ Push…</strong> shows the repo, path and branch. Nothing is pushed until you type <strong>yes</strong>. Double-check the branch first.</li>
+<li><strong>▶ Run…</strong> on a downloaded file asks first. Only run code you trust.</li>
+<li>The <strong>🐙 GitHub browser</strong> in More is read-only. It can't run downloaded code. Save the file with <code>s &lt;number&gt;</code> and read it first.</li>
+</ul>
+<h3>6. Allowed sites</h3>
+<p>Your scripts can only reach the internet sites on this list, which includes the tester in Dev ▸ <strong>🌐 HTTP</strong>. Open <strong>🧰 Tools ▸ 🌐 Allowed sites</strong>.</p>
+<ul>
+<li>Type an <code>https://</code> address with no path, such as <code>https://api.example.com</code>, and tap <strong>Add</strong>.</li>
+<li>Only this screen can change the list. Scripts can't.</li>
+<li><strong>Reset to defaults…</strong> clears your additions.</li>
+<li>The defaults include GitHub's API and PyPI.</li>
+</ul>
+<h3>7. Backups</h3>
+<p>Do this often. In <strong>📁 Files ▸ Backup</strong>, tap <strong>⬇️ Export</strong> to save one JSON file with every script, all your tool data and saved versions. Your passcode isn't included.</p>
+<ul>
+<li>Save it to iCloud or Files.</li>
+<li><strong>⬆️ Import</strong> restores a backup.</li>
+<li><strong>↶ Undo</strong> brings back the last change made by Python, or a script you deleted.</li>
+<li><strong>Reset all data…</strong> wipes everything. Export a backup first!</li>
+</ul>
+<p>Your scripts are stored as plain text on the phone, so <strong>don't paste passwords or tokens into scripts.</strong></p>
+<h3>8. Troubleshooting</h3>
+<ul>
+<li><strong>The button stays on "Loading Python…":</strong> connect to the internet once so Python can download, then reopen the app.</li>
+<li><strong>A script hangs:</strong> tap <strong>⏹ Stop</strong>. If Python is busy, the Dev buttons tell you to tap Stop.</li>
+<li><strong>"⟳ KPython update ready. Tap to reload (your scripts are saved)." bar:</strong> tap it to reload. Your editor is saved first. You can also search the palette for <strong>Check for KPython update</strong>.</li>
+<li><strong>A fetch fails or gets blocked:</strong> add the site in <strong>🌐 Allowed sites</strong>.</li>
+<li><strong>Something got deleted or changed:</strong> try <strong>↶ Undo</strong> or <strong>📜 History</strong>, or import your last backup.</li>
+<li><strong>A package won't install:</strong> only pure-Python or Pyodide-built packages work.</li>
+</ul>
+<h3>9. Finding things fast</h3>
+<ul>
+<li>Tap <strong>🔎</strong> (or Ctrl/⌘+K on a keyboard) to open the command palette: <em>Search every tool and button… (lint, sites, merge)</em>. ↑↓ move, Enter opens, Esc closes. It understands words like "run all", "delete", "update".</li>
+<li><strong>🧭 Getting-started tour</strong> (Dev tab) walks through the basics. It's offered once on first launch.</li>
+<li><strong>🧪 Self-test all tools</strong> (Dev tab) checks every tool and remembers the last results.</li>
+<li><strong>📘 Examples</strong> (Dev tab) has 10 small runnable examples.</li>
+<li><strong>Cancel</strong> on any question in a Dev tool goes back one step; Cancel twice in a row leaves the tool.</li>
+<li>The <strong>🌓</strong> menu at the top switches System, Light or Dark.</li>
+</ul>

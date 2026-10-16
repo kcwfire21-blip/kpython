@@ -315,8 +315,10 @@ def _run(kind, src, path=None, name="pasted.py"):
         nm = input("Variable name: ").strip(); ln = input("Line of assignment (Enter to skip): ").strip()
         if ln and not ln.isdigit(): print("Line must be a number (or Enter to skip)."); return
         new, msg = inline(src, nm, int(ln) if ln else None)
-    else:
+    elif kind == "3":
         new, n, sk = to_fstrings(src)
+    else:
+        print("Pick 1, 2 or 3."); return
         msg = f"{n} call(s) converted." + ("".join("\nskipped " + s for s in sk) if sk else "")
     _apply(src, new, msg, path, name)
 
@@ -389,9 +391,9 @@ k = "%s %s" % pair
     v = 5; new, n, _ = to_fstrings('r = "<{}>".format("%s" % v)\n'); ns = {"v": v}; exec(new, ns)
     assert n == 2 and ns["r"] == "<5>" and "format" not in new and "%" not in new, new
     try: _safe("/etc/passwd"); raise AssertionError("path guard failed")
-    except PermissionError: pass
+    except (PermissionError, ValueError): pass
     try: _safe("/home/pyodide/../../etc/x"); raise AssertionError("path guard failed")
-    except PermissionError: pass
+    except (PermissionError, ValueError): pass
     print("self-tests passed")
 
 def main():

@@ -50,7 +50,14 @@ def merge3(base, ours, theirs):
         elif not go or o_txt == t_txt:
             out += t_txt
         else:
-            out.append(Conflict(o_txt, base[s:e], t_txt))
+            # KPython: lines both sides agree on stay outside the conflict
+            p = 0
+            while p < len(o_txt) and p < len(t_txt) and o_txt[p] == t_txt[p]: p += 1
+            q = 0
+            while q < len(o_txt) - p and q < len(t_txt) - p and o_txt[-1 - q] == t_txt[-1 - q]: q += 1
+            out += o_txt[:p]
+            out.append(Conflict(o_txt[p:len(o_txt) - q], base[s:e], t_txt[p:len(t_txt) - q]))
+            out += o_txt[len(o_txt) - q:]
         pos = e
     return out + base[pos:]
 
@@ -65,6 +72,14 @@ def _nl(lines):
 def render(parts, choices=None):
     """choices: list per conflict of 'o','t','b'(both),'base','m'(markers). Default markers."""
     out, k = [], 0
+    class _Out(list):  # KPython: never glue two lines together when one lacks its final newline
+        def __iadd__(self, more):
+            for x in more: self.append(x)
+            return self
+        def append(self, x):
+            if self and not self[-1].endswith("\n"): self[-1] += "\n"
+            super().append(x)
+    out = _Out()
     for p in parts:
         if not isinstance(p, Conflict):
             out.append(p)
@@ -274,7 +289,7 @@ async def amain():
             t = choose_source("THEIRS", full, scripts)
             parts = merge3(b.splitlines(True), o.splitlines(True), t.splitlines(True))
             n = len(conflicts(parts))
-            print(f"\nAuto-merged. {n} conflict(s).")
+            print(f"\nMerged with {n} conflict(s) to resolve." if n else "\nAuto-merged cleanly, no conflicts.")
             ch = resolve(parts) if n else None
             if n and ch is None:
                 print("Merge cancelled, nothing written."); continue
