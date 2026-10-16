@@ -43,7 +43,7 @@ $('new').onclick=()=>{const n=prompt('Script name?');if(n)newScript(n,'print("hi
 $('snipbtn').onclick=()=>{showView('v-files');setTimeout(()=>$('snip-list').scrollIntoView({behavior:'smooth'}),50)};
 
 /* keybar */
-const KEYS=[['⇥','    '],[':',':'],['( )','()',1],['[ ]','[]',1],['{ }','{}',1],['" "','""',1],["' '","''",1],['=','='],['#','# '],['.','.'],[',',','],['←','L'],['→','R'],['↶','U']];
+const KEYS=[['⇥','    '],[':',':'],['( )','()',1],['[ ]','[]',1],['{ }','{}',1],['" "','""',1],["' '","''",1],['=','='],['_','_'],['#','# '],['.','.'],[',',','],['←','L'],['→','R'],['↶','U']];
 $('keybar').innerHTML=KEYS.map((k,i)=>`<button data-i="${i}">${k[0]}</button>`).join('');
 $('keybar').querySelectorAll('button').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('touchstart',e=>{e.preventDefault();b.click()},{passive:false});b.onclick=()=>{const k=KEYS[b.dataset.i];
  if(k[1]==='L')cm.execCommand('goCharLeft');else if(k[1]==='R')cm.execCommand('goCharRight');else if(k[1]==='U')cm.undo();
@@ -53,7 +53,7 @@ cm.on('focus',()=>setTimeout(placeKeybar,300));cm.on('blur',()=>setTimeout(place
 
 /* ---------- output ---------- */
 let outEl=null;
-function log(t,c){const o=outEl||$('out');const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';o.appendChild(s);if(!outEl)s.scrollIntoView({block:'nearest'})}
+function log(t,c){const o=outEl||$('out');const s=document.createElement('span');if(c)s.className=c;if(c==='err')linkify(s,t+'\n');else s.textContent=t+'\n';o.appendChild(s);if(!outEl)s.scrollIntoView({block:'nearest'})}
 window.kpShowImg=b64=>{const i=new Image();i.src='data:image/png;base64,'+b64;(outEl||$('out')).appendChild(i)};
 $('clr').onclick=()=>$('out').textContent='';
 
@@ -67,35 +67,56 @@ window.kpT=(op,...a)=>{if(!tuCanvas){tuCanvas=document.createElement('canvas');t
  else if(op==='text'){x.fillStyle=a[3];x.font=(16*sc)+'px sans-serif';x.fillText(a[2],...P(a[0],a[1]))}};
 function clearT(c){const x=c.getContext('2d');x.fillStyle=c.dataset.bg||'#010409';x.fillRect(0,0,c.width,c.height)}
 
-/* ---------- Python ---------- */
-
-let py=null,running=false;
-const pyReady=(async()=>{try{py=await loadPyodide();py.setStdout({batched:t=>log(t)});py.setStderr({batched:t=>log(t,'err')});
- await py.runPythonAsync(await (await fetch('kp_setup.py')).text());
- $('run').disabled=false;$('run').textContent='▶ Run';$('pystat').textContent='Python '+py.version;$('pystat').classList.add('ok');log('Python '+py.version+' ready','sys');
- $('c-unit').innerHTML=py.runPython('list(UNITS)').toJs().map(k=>`<option>${k}</option>`).join('');return py}
- catch(e){$('run').textContent='Python failed to load';$('pystat').textContent='Python offline';log(String(e),'err');throw e}})();
-async function runPy(code,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy');return}running=true;
- outEl=target;tuCanvas=turtle;try{py.globals.get('_kp_reset_turtle')();
-  try{await py.loadPackagesFromImports(code,{messageCallback:m=>log(m,'sys')})}catch(e){log('Package load: '+e.message,'err')}
-  if(/matplotlib/.test(code)){await py.runPythonAsync('import matplotlib');py.globals.get('_kp_mpl_patch')()}
-  const ns=py.globals.get('dict')();ns.set('__name__','__main__');
-  const r=await py.runPythonAsync(code,{globals:ns});if(r!==undefined&&r!==null&&!(r.destroy))log(String(r));
-  if(/matplotlib/.test(code))py.globals.get('_kp_show')();ns.destroy();return true}
- catch(e){const m=String(e.message||e).trim();log(/KeyboardInterrupt: input cancelled/.test(m)?'⏹ Stopped (input cancelled)':m,'err');return false}
- finally{try{py.runPython('import sys;sys.stdout.flush();sys.stderr.flush()')}catch(e){}outEl=null;tuCanvas=null;running=false}}
-async function run(){scripts[cur]=cm.getValue();persist();log('— run '+cur+' —','sys');$('run').disabled=true;const t0=performance.now();
- const ok=await runPy(cm.getValue());log(`— ${ok?'done':'error'} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys');$('run').disabled=false}
-$('run').onclick=run;
-function pycall(name,...a){return py.globals.get(name)(...a)}
+/* ---------- Python (v4: runs in a Web Worker so Stop works) ---------- */
+const TOOLS=['r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
+const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
+let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
+function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
+async function startWorker(){newReady();$('pystat').textContent='Loading Python…';$('pystat').classList.remove('ok');setRunBtns();
+ if(!setupTxt){setupTxt=await (await fetch('kp_setup.py')).text();wsetupTxt=await (await fetch('kp_worker.py')).text()}
+ if(self.crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined'){SAB=new SharedArrayBuffer(12+65536);INTR=new Uint8Array(SAB,0,1);CTL=new Int32Array(SAB,4,2);DAT=new Uint8Array(SAB,12)}
+ W=new Worker('worker.js');W.onmessage=onW;W.onerror=e=>log('Worker error: '+(e.message||e),'err');
+ W.postMessage({cmd:'init',pkgs:J('kp_pkgs',[]),native:['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'],sab:SAB,setup:setupTxt,wsetup:wsetupTxt,tools:TOOLS})}
+function onW(e){const m=e.data;
+ if(m.t==='out')log(m.s,m.c);else if(m.t==='img')kpShowImg(m.b);else if(m.t==='turtle')kpT(...m.a);
+ else if(m.t==='input')askInput(m);
+ else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');
+  $('c-unit').innerHTML=m.units.map(k=>`<option>${esc(k)}</option>`).join('');readyRes();setRunBtns();log('Python '+m.v+' ready'+(m.sab?'':' (compat mode: Stop restarts Python)'),'sys')}
+ else if(m.t==='fail'){$('pystat').textContent='Python offline';$('run').textContent='Python failed to load';log(m.s,'err')}
+ else if(m.t==='done'){const p=pend[m.id];delete pend[m.id];if(p)p(m)}}
+function wcall(msg){return new Promise(res=>{const id=++seq;pend[id]=res;W.postMessage({...msg,id})})}
+function allFiles(){if(cur)scripts[cur]=cm.getValue();return scripts}
+/* inline input() box inside the output area */
+let inputMsg=null;
+function askInput(m){inputMsg=m;const o=outEl||$('out');const row=document.createElement('div');row.className='inrow';
+ row.innerHTML='<span class="inp"></span><input autocapitalize="off" autocorrect="off" spellcheck="false"><button class="pri">↵</button><button>✕</button>';row.querySelector('.inp').textContent=m.p||'input:';
+ o.appendChild(row);const inp=row.querySelector('input');const fin=v=>{row.remove();answerInput(v)};
+ inp.onkeydown=e=>{if(e.key==='Enter')fin(inp.value)};row.querySelectorAll('button')[0].onclick=()=>fin(inp.value);row.querySelectorAll('button')[1].onclick=()=>fin(null);
+ setTimeout(()=>{inp.focus();row.scrollIntoView({block:'nearest'})},30)}
+function answerInput(v){const m=inputMsg;inputMsg=null;if(!m)return;
+ if(m.mode==='sab'){if(v!==null){const b=new TextEncoder().encode(v).slice(0,65536);DAT.set(b);Atomics.store(CTL,1,b.length)}Atomics.store(CTL,0,v===null?-1:1);Atomics.notify(CTL,0)}
+ else navigator.serviceWorker.controller?.postMessage({kpInput:m.id,v:v??'',cancel:v===null})}
+async function stopPy(){if(!running)return;log('⏹ Stopping…','sys');document.querySelectorAll('.inrow').forEach(r=>r.remove());
+ if(inputMsg)answerInput(null);
+ if(INTR){INTR[0]=2;const t=Date.now();while(running&&Date.now()-t<1500)await new Promise(r=>setTimeout(r,50));if(!running)return}
+ hardRestart()}
+function hardRestart(){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Stopped. Python was restarted (console variables were cleared).'}));pend={};inputMsg=null;startWorker()}
+function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textContent=busy?'Running…':'▶ Run';$('stop').hidden=!busy;$('stopbtn').hidden=!busy;$('r-go').disabled=busy}
+async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;setRunBtns();outEl=target;tuCanvas=turtle;
+ try{const r=await wcall(msg);if(!r.ok&&r.err)log(r.err,'err');return r}finally{outEl=null;tuCanvas=null;running=false;setRunBtns()}}
+async function runPy(code,o={}){const r=await job({cmd:'run',code,files:allFiles(),fname:'__kp_run__.py'},o);return r.ok}
+async function run(){scripts[cur]=cm.getValue();persist();clearErr();log('— run '+cur+' —','sys');const t0=performance.now();
+ const r=await job({cmd:'run',code:cm.getValue(),files:allFiles(),fname:modname(cur)+'.py'});log(`— ${r.ok?'done':'error'} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys')}
+$('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
+async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
+startWorker();
 
 /* packages */
-async function installPkg(name){name=name.trim();if(!name)return;showView('v-code');log('Installing '+name+'…','sys');await pyReady;
- try{if(['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'].includes(name.toLowerCase()))await py.loadPackage(name.toLowerCase(),{messageCallback:m=>log(m,'sys')});
-  else{await py.loadPackage('micropip');const mp=py.pyimport('micropip');await mp.install(name);mp.destroy()}
-  log('✅ '+name+' installed. import it in your script.','sys');const l=J('kp_pkgs',[]);if(!l.includes(name)){l.push(name);S('kp_pkgs',l)}}
- catch(e){log('❌ '+name+': '+String(e.message||e).split('\n').slice(-2).join(' '),'err')}}
+async function installPkg(name){name=name.trim();if(!name)return;showView('v-code');log('Installing '+name+'…','sys');
+ const native=['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'].includes(name.toLowerCase());
+ const r=await job({cmd:'pkg',name:native?name.toLowerCase():name,native});
+ if(r.ok){log('✅ '+name+' installed. import it in your script.','sys');const l=J('kp_pkgs',[]);if(!l.includes(name)){l.push(name);S('kp_pkgs',l)}}}
 $('pkginst').onclick=()=>installPkg($('pkgname').value);
 document.querySelectorAll('.qp').forEach(b=>b.onclick=()=>installPkg(b.dataset.p));
 
@@ -103,7 +124,7 @@ document.querySelectorAll('.qp').forEach(b=>b.onclick=()=>installPkg(b.dataset.p
 const EXTRAS=["Windows (interior)",40,"Fridge / microwave",25,"Restroom deep clean",35,"Carpet vacuum deep",30,"Trash haul-away",20,"Floor mop & shine",45];
 let exH='';for(let i=0;i<EXTRAS.length;i+=2)exH+=`<label><input type="checkbox" value="${EXTRAS[i]}">${EXTRAS[i]} +$${EXTRAS[i+1]}</label>`;$('q-extras').innerHTML=exH;
 $('q-go').onclick=async()=>{await pyReady;const ex=[...$('q-extras').querySelectorAll('input:checked')].map(i=>i.value);
- $('q-out').textContent=pycall('make_invoice',$('q-client').value,$('q-sqft').value,$('q-rate').value,$('q-freq').value,JSON.stringify(ex),$('q-notes').value)};
+ $('q-out').textContent=await pycall('make_invoice',$('q-client').value,$('q-sqft').value,$('q-rate').value,$('q-freq').value,JSON.stringify(ex),$('q-notes').value)};
 async function shareText(title,text){if(!text)return;if(navigator.share){try{await navigator.share({title,text});return}catch(e){if(e.name==='AbortError')return}}await copyText(text)}
 async function copyText(t){try{await navigator.clipboard.writeText(t);alert('Copied!')}catch(e){prompt('Copy this:',t)}}
 $('q-copy').onclick=()=>copyText($('q-out').textContent);$('q-share').onclick=()=>shareText('Invoice',$('q-out').textContent);
@@ -112,40 +133,40 @@ $('q-copy').onclick=()=>copyText($('q-out').textContent);$('q-share').onclick=()
 $('h-date').value=today();$('h-rate').value=LS.getItem('kp_rate')||'18.00';
 function shiftHours(s){let[a,b]=[s.start,s.end].map(t=>{const[h,m]=t.split(':');return +h*60+ +m});if(b<=a)b+=1440;return Math.max(0,(b-a-(+s.brk||0))/60)}
 function weekKey(d){const x=new Date(d+'T12:00');const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);return x.toISOString().slice(0,10)}
-function renderHours(){const L=J('kp_hours',[]).sort((a,b)=>b.date.localeCompare(a.date)),wk={};L.forEach(s=>(wk[weekKey(s.date)]??=[]).push(s));
+function renderHours(){const L=J('kp_hours',[]).filter(s=>s&&/^\d{4}-\d\d-\d\d$/.test(s.date)&&/^\d\d:\d\d$/.test(s.start)&&/^\d\d:\d\d$/.test(s.end)).sort((a,b)=>b.date.localeCompare(a.date)),wk={};L.forEach(s=>(wk[weekKey(s.date)]??=[]).push(s));
  $('h-list').innerHTML=Object.keys(wk).sort().reverse().map(k=>{const ss=wk[k];const hrs=ss.reduce((t,s)=>t+shiftHours(s),0);const reg=Math.min(hrs,40),ot=Math.max(hrs-40,0);
   const avg=ss.reduce((t,s)=>t+shiftHours(s)*s.rate,0)/(hrs||1);const pay=reg*avg+ot*avg*1.5;
-  return `<div class="wk">Week of ${k}: ${hrs.toFixed(2)} h${ot?` (${ot.toFixed(2)} OT)`:''} · ${money(pay)}</div>`+ss.map(s=>`<div class="item"><span>${s.date} ${s.start}–${s.end}<br><small class="hint">${shiftHours(s).toFixed(2)} h @ ${money(s.rate)}</small></span><span>${money(shiftHours(s)*s.rate)} <button data-id="${s.id}">✕</button></span></div>`).join('')}).join('')||'<p class="hint">No shifts yet.</p>';
+  return `<div class="wk">Week of ${esc(k)}: ${hrs.toFixed(2)} h${ot?` (${ot.toFixed(2)} OT)`:''} · ${money(pay)}</div>`+ss.map(s=>`<div class="item"><span>${esc(s.date)} ${esc(s.start)}–${esc(s.end)}<br><small class="hint">${shiftHours(s).toFixed(2)} h @ ${money(s.rate)}</small></span><span>${money(shiftHours(s)*s.rate)} <button data-id="${esc(s.id)}">✕</button></span></div>`).join('')}).join('')||'<p class="hint">No shifts yet.</p>';
  $('h-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(confirm('Delete shift?')){S('kp_hours',J('kp_hours',[]).filter(s=>s.id!=b.dataset.id));renderHours()}})}
 $('h-add').onclick=()=>{const s={id:Date.now(),date:$('h-date').value||today(),start:$('h-start').value,end:$('h-end').value,brk:+$('h-brk').value||0,rate:+$('h-rate').value||0};
  if(!s.start||!s.end)return alert('Enter start and end');LS.setItem('kp_rate',$('h-rate').value);const L=J('kp_hours',[]);L.push(s);S('kp_hours',L);renderHours()};
 // budget
 $('b-date').value=today();
-function renderBudget(){const L=J('kp_budget',[]).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);let bal=0,inc=0,exp=0;
- const rows=L.map(e=>{const v=e.type==='in'?e.amt:-e.amt;bal+=v;e.type==='in'?inc+=e.amt:exp+=e.amt;return `<div class="item"><span>${e.date} ${esc(e.desc)}</span><span><b class="${e.type==='in'?'amt-in':'amt-out'}">${e.type==='in'?'+':'−'}${money(e.amt)}</b> <small class="hint">${money(bal)}</small> <button data-id="${e.id}">✕</button></span></div>`});
+function renderBudget(){const L=J('kp_budget',[]).filter(e=>e&&typeof e.date==='string'&&isFinite(e.amt)).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);let bal=0,inc=0,exp=0;
+ const rows=L.map(e=>{const v=e.type==='in'?e.amt:-e.amt;bal+=v;e.type==='in'?inc+=e.amt:exp+=e.amt;return `<div class="item"><span>${esc(e.date)} ${esc(e.desc)}</span><span><b class="${e.type==='in'?'amt-in':'amt-out'}">${e.type==='in'?'+':'−'}${money(e.amt)}</b> <small class="hint">${money(bal)}</small> <button data-id="${esc(e.id)}">✕</button></span></div>`});
  $('b-sum').innerHTML=`Balance <span class="${bal>=0?'amt-in':'amt-out'}" style="color:${bal>=0?'var(--ok)':'var(--bad)'}">${money(bal)}</span> · in ${money(inc)} · out ${money(exp)}`;
  $('b-list').innerHTML=rows.reverse().join('')||'<p class="hint">No entries yet.</p>';
  $('b-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(confirm('Delete entry?')){S('kp_budget',J('kp_budget',[]).filter(s=>s.id!=b.dataset.id));renderBudget()}})}
 $('b-add').onclick=()=>{const amt=Math.abs(+$('b-amt').value);if(!amt)return alert('Enter an amount');const L=J('kp_budget',[]);L.push({id:Date.now(),type:$('b-type').value,amt,desc:$('b-desc').value||($('b-type').value==='in'?'Income':'Expense'),date:$('b-date').value||today()});S('kp_budget',L);$('b-amt').value='';$('b-desc').value='';renderBudget()};
 // miles
 $('m-date').value=today();$('m-rate').value=LS.getItem('kp_mrate')||'0.70';
-function renderMiles(){const L=J('kp_miles',[]).sort((a,b)=>b.date.localeCompare(a.date));const r=+$('m-rate').value||0;const tot=L.reduce((t,m)=>t+m.mi,0);const yr=new Date().getFullYear()+'';const ytd=L.filter(m=>m.date.startsWith(yr)).reduce((t,m)=>t+m.mi,0);
+function renderMiles(){const L=J('kp_miles',[]).filter(m=>m&&typeof m.date==='string'&&isFinite(m.mi)).map(m=>({...m,mi:+m.mi})).sort((a,b)=>b.date.localeCompare(a.date));const r=+$('m-rate').value||0;const tot=L.reduce((t,m)=>t+m.mi,0);const yr=new Date().getFullYear()+'';const ytd=L.filter(m=>m.date.startsWith(yr)).reduce((t,m)=>t+m.mi,0);
  $('m-sum').textContent=`Total ${tot.toFixed(1)} mi · ${yr}: ${ytd.toFixed(1)} mi ≈ ${money(ytd*r)} deduction`;
- $('m-list').innerHTML=L.map(m=>`<div class="item"><span>${m.date} ${esc(m.why)}</span><span>${m.mi.toFixed(1)} mi <button data-id="${m.id}">✕</button></span></div>`).join('')||'<p class="hint">No trips yet.</p>';
+ $('m-list').innerHTML=L.map(m=>`<div class="item"><span>${esc(m.date)} ${esc(m.why)}</span><span>${(+m.mi||0).toFixed(1)} mi <button data-id="${esc(m.id)}">✕</button></span></div>`).join('')||'<p class="hint">No trips yet.</p>';
  $('m-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(confirm('Delete trip?')){S('kp_miles',J('kp_miles',[]).filter(s=>s.id!=b.dataset.id));renderMiles()}})}
 $('m-rate').onchange=()=>{LS.setItem('kp_mrate',$('m-rate').value);renderMiles()};
 $('m-add').onclick=()=>{const mi=+$('m-mi').value;if(!mi)return alert('Enter miles');const L=J('kp_miles',[]);L.push({id:Date.now(),date:$('m-date').value||today(),mi,why:$('m-why').value||'Trip'});S('kp_miles',L);$('m-mi').value='';$('m-why').value='';renderMiles()};
 // calc
-$('c-tipgo').onclick=async()=>{await pyReady;$('c-tipout').textContent=pycall('tip_calc',$('c-bill').value,$('c-tip').value,$('c-ppl').value)};
-$('c-ugo').onclick=async()=>{await pyReady;$('c-uout').textContent=pycall('convert',$('c-val').value,$('c-unit').value)};
+$('c-tipgo').onclick=async()=>{await pyReady;$('c-tipout').textContent=await pycall('tip_calc',$('c-bill').value,$('c-tip').value,$('c-ppl').value)};
+$('c-ugo').onclick=async()=>{await pyReady;$('c-uout').textContent=await pycall('convert',$('c-val').value,$('c-unit').value)};
 document.querySelectorAll('[data-snip]').forEach(b=>b.onclick=()=>{const s=SNIPPETS.find(x=>x.name.startsWith(b.dataset.snip));newScript(s.name+' ('+s.by+')',s.code);showView('v-code');run()});
-function renderTools(){renderHours();renderBudget();renderMiles()}
+function renderTools(){for(const f of [renderHours,renderBudget,renderMiles])try{f()}catch(e){console.error(e)}}
 
 /* ---------- Fun (Python bits) ---------- */
 const GUESS='import random\nsecret = random.randint(1, 100)\ntries = 0\nprint("I\'m thinking of a number from 1 to 100.")\nwhile True:\n    g = input("Your guess (q to quit): ").strip()\n    if g.lower() == "q":\n        print(f"It was {secret}."); break\n    if not g.isdigit():\n        print("Numbers only!"); continue\n    tries += 1\n    g = int(g)\n    if g < secret: print(f"{g}: higher ⬆️")\n    elif g > secret: print(f"{g}: lower ⬇️")\n    else:\n        print(f"🎉 {g} is right! {tries} tries."); break';
 $('gu-go').onclick=()=>{$('gu-out').textContent='';runPy(GUESS,{target:$('gu-out')})};
 $('eb-go').onclick=async()=>{const b=$('eb-ball');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');$('eb-a').textContent='…';
- let a;try{await pyReady;a=pycall('eight_ball')}catch(e){a=['Yes.','No.','Ask again later.'][Math.random()*3|0]}setTimeout(()=>$('eb-a').textContent=a,500)};
+ let a;try{await pyReady;a=await pycall('eight_ball');if(/^Error|busy/.test(a))throw 0}catch(e){a=['Yes.','No.','Ask again later.'][Math.random()*3|0]}setTimeout(()=>$('eb-a').textContent=a,500)};
 const TU_DEFAULT='import turtle\nt = turtle.Turtle()\nt.bgcolor("#0b1020")\ncolors = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"]\nfor i in range(36):\n    t.color(colors[i % 5])\n    t.circle(80)\n    t.left(10)';
 $('tu-code').value=LS.getItem('kp_turtle')||TU_DEFAULT;
 $('tu-go').onclick=()=>{LS.setItem('kp_turtle',$('tu-code').value);const c=$('tu-c');c.width=c.height=640;clearT(c);runPy($('tu-code').value,{target:document.createElement('div'),turtle:c}).then(ok=>{if(!ok)alert('Turtle code error, check it in the Code tab')})};
@@ -157,7 +178,7 @@ function renderFiles(){$('f-list').innerHTML=Object.keys(scripts).map(n=>`<div c
   if(a==='open'){cur=n;refresh();showView('v-code')}else if(a==='dup'){newScript(n+' copy',scripts[n]);renderFiles()}
   else if(a==='ren'){const m=prompt('New name',n);if(m&&m!==n&&!(m in scripts)){scripts[m]=scripts[n];delete scripts[n];if(cur===n)cur=m;refresh();renderFiles()}}
   else if(a==='del'&&confirm('Delete '+n+'?')){delete scripts[n];if(cur===n)cur='';refresh();renderFiles()}})})}
-const cats=[...new Set(SNIPPETS.map(s=>s.cat))];$('sn-filter').innerHTML+=cats.map(c=>`<option>${c}</option>`).join('');
+const cats=[...new Set(SNIPPETS.map(s=>s.cat))];$('sn-filter').innerHTML+=cats.map(c=>`<option>${esc(c)}</option>`).join('');
 function renderSnips(){const f=$('sn-filter').value;$('snip-list').innerHTML=SNIPPETS.map((s,i)=>(!f||s.cat===f)?`<div class="snip"><b>${esc(s.name)}</b><span class="by">${s.by!=='KPython'?'🤖 by '+esc(s.by)+(s.cat!=='Team'?' · '+esc(s.cat):''):esc(s.cat)}</span><div class="row"><button data-i="${i}" data-a="open">Open</button><button data-i="${i}" data-a="run" class="pri">▶ Run</button></div></div>`:'').join('');
  $('snip-list').querySelectorAll('button').forEach(b=>b.onclick=()=>{const s=SNIPPETS[b.dataset.i];newScript(s.name+(s.by!=='KPython'?' ('+s.by+')':''),s.code);showView('v-code');if(b.dataset.a==='run')run()})}
 $('sn-filter').onchange=renderSnips;
@@ -168,8 +189,13 @@ function exportData(){if(cur)scripts[cur]=cm.getValue();persist();const d={app:'
 $('bk-exp').onclick=async()=>{const txt=JSON.stringify(exportData(),null,1),name=`kpython-backup-${today()}.json`;const file=new File([txt],name,{type:'application/json'});
  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});$('bk-msg').textContent='Shared '+name;return}catch(e){if(e.name==='AbortError')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();$('bk-msg').textContent='Downloaded '+name};
-function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object')throw new Error('Not a KPython backup');
- scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k))LS.setItem(k,v)});refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
+const VALID={kp_hours:x=>Array.isArray(x)&&x.every(s=>s&&/^\d{4}-\d\d-\d\d$/.test(s.date)&&/^\d\d:\d\d$/.test(s.start)&&/^\d\d:\d\d$/.test(s.end)&&isFinite(s.rate)&&isFinite(s.id)),
+ kp_budget:x=>Array.isArray(x)&&x.every(e=>e&&/^\d{4}-\d\d-\d\d$/.test(e.date)&&['in','out'].includes(e.type)&&isFinite(e.amt)&&isFinite(e.id)&&typeof e.desc==='string'),
+ kp_miles:x=>Array.isArray(x)&&x.every(m=>m&&/^\d{4}-\d\d-\d\d$/.test(m.date)&&isFinite(m.mi)&&isFinite(m.id)&&typeof m.why==='string'),
+ kp_pkgs:x=>Array.isArray(x)&&x.every(p=>typeof p==='string'&&/^[\w.\-\[\]=<>]+$/.test(p))};
+function validKey(k,v){if(typeof v!=='string')return false;if(!VALID[k])return true;try{return VALID[k](JSON.parse(v))}catch(e){return false}}
+function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||Array.isArray(d.scripts)||!Object.values(d.scripts).every(v=>typeof v==='string'))throw new Error('Not a valid KPython backup');
+ scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;const bad=[];Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
 $('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
@@ -177,4 +203,4 @@ $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your p
 
 refresh();renderTools();renderSnips();setupLock();
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');
-window.KP={exportData,importData,runPy,pyReady};
+window.KP={exportData,importData,runPy,get pyReady(){return pyReady},stopPy,cm:()=>cm};

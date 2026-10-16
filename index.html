@@ -1,30 +1,58 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://cdn.jsdelivr.net; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Keivon's Python</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="KPython">
 <meta name="theme-color" content="#0d1117"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" integrity="sha384-ccdJwIIg/K0Ab6aXF4MPACh7ckk61tvQFTrfkhXZEALgAETURNZIAuQLcS/aPbrM" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css" integrity="sha384-TU/qRI67N04B589luYdn1ZMRIGgJic3GB1WsvLJTRh92VO26vpxI4dCKiDtsR4fw" crossorigin="anonymous">
 <link rel="stylesheet" href="app.css">
 </head><body>
 <div id="lock"><div class="logo">🐍</div><h2>Keivon's Python</h2><div id="lmsg"></div><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button id="lbtn" class="pri">Unlock</button></div>
 
-<header id="top"><h1>🐍 KPython</h1><span id="pystat" class="pill">Loading Python…</span><button id="lockbtn" title="Lock">🔒</button></header>
+<header id="top"><h1>🐍 KPython</h1><span id="pystat" class="pill">Loading Python…</span><button id="stopbtn" class="danger" hidden title="Stop Python">⏹</button><button id="lockbtn" title="Lock">🔒</button></header>
 
 <main>
 <!-- CODE -->
 <section id="v-code" class="view on">
  <div class="row"><select id="sel"></select><button id="new">＋</button><button id="save">💾</button><button id="snipbtn">📚</button></div>
+ <div class="row etools"><button id="e-find" title="Find/replace">🔍</button><button id="e-goto" title="Go to line">#</button><button id="e-fsm" title="Smaller text">A−</button><button id="e-fsp" title="Bigger text">A+</button><button id="e-wrap" title="Word wrap">↩︎</button><button id="e-share" title="Share/export .py">📤</button><button id="e-imp" title="Import .py from Files">📥</button><input id="e-file" type="file" accept=".py,.txt,text/x-python,text/plain" multiple hidden></div>
+ <div id="findbar" class="card" hidden><div class="row"><input id="f-q" placeholder="Find" autocapitalize="off" autocorrect="off" spellcheck="false"><button id="f-prev">▲</button><button id="f-next">▼</button><button id="f-x">✕</button></div>
+  <div class="row"><input id="f-r" placeholder="Replace with" autocapitalize="off" autocorrect="off" spellcheck="false"><button id="f-rep">Replace</button><button id="f-all">All</button></div>
+  <div class="row hint"><label class="ck"><input type="checkbox" id="f-case"> Match case</label><span id="f-msg"></span></div></div>
  <div id="edwrap"><textarea id="code"></textarea></div>
  <div id="keybar"></div>
- <div class="row"><button id="run" class="pri big" disabled>Loading Python…</button><button id="clr">🧹</button></div>
+ <div class="row"><button id="run" class="pri big" disabled>Loading Python…</button><button id="stop" class="danger big" hidden>⏹ Stop</button><button id="clr">🧹</button></div>
  <details id="pkgs"><summary>📦 Packages</summary>
   <div class="row"><input id="pkgname" placeholder="package name (pure-Python or Pyodide)" autocapitalize="off" autocorrect="off"><button id="pkginst">Install</button></div>
   <div class="row"><button class="qp" data-p="numpy">numpy</button><button class="qp" data-p="pandas">pandas</button><button class="qp" data-p="matplotlib">matplotlib</button></div>
   <div class="hint">Imports like <code>import numpy</code> also auto-load. Loaded packages are cached for offline use.</div>
  </details>
  <div id="out"></div>
+</section>
+
+<!-- REPL -->
+<section id="v-repl" class="view">
+ <div id="r-out" class="console"><span class="sys">Python console. Variables stay between commands. Saved scripts can be imported by name (e.g. "Cleaning Quote" → import cleaning_quote). Try help(str.split).
+</span></div>
+ <div class="row rin"><span id="r-ps">&gt;&gt;&gt;</span><textarea id="r-in" rows="2" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="x = 5   (Enter runs, Shift+Enter or a trailing : adds a line)"></textarea></div>
+ <div class="row"><button id="r-go" class="pri">▶ Send</button><button id="r-up">↑</button><button id="r-down">↓</button><button id="r-clr">🧹</button><button id="r-reset">Reset</button></div>
+ <div class="card"><h3>📖 Docs</h3><div class="row"><input id="d-q" placeholder="help on… e.g. str.split, json.dumps, os.path" autocapitalize="off" autocorrect="off" spellcheck="false"><button id="d-go" class="pri">help()</button></div>
+  <div class="chips"><button class="dq">str.split</button><button class="dq">list.sort</button><button class="dq">json.dumps</button><button class="dq">re.sub</button><button class="dq">open</button><button class="dq">datetime.datetime.strptime</button></div>
+  <pre id="d-out" class="inv docs"></pre><h3>Quick reference</h3><div id="d-ref"></div></div>
+</section>
+
+<!-- DEV -->
+<section id="v-dev" class="view">
+ <div class="card"><h3>Current script</h3><p class="hint">Works on the script open in the Code tab.</p>
+  <div class="g2"><button data-dev="lint" class="pri">🧹 Lint</button><button data-dev="tests" class="pri">✅ Run tests</button><button data-dev="outline">🗂 Outline</button><button data-dev="rename">✏️ Rename…</button><button data-dev="profile">⏱ Profile</button><button data-dev="bench">📊 Benchmark</button></div></div>
+ <div class="card"><h3>Diff two scripts</h3><div class="g2"><select id="dv-a"></select><select id="dv-b"></select></div><div class="row"><label class="ck"><input type="checkbox" id="dv-side"> Side by side</label><button data-dev="diff" class="pri">Compare</button><button data-dev="patch">Patch…</button></div></div>
+ <div class="card"><h3>Tools</h3><div class="g2"><button data-dev="sql">🗄 SQL</button><button data-dev="http">🌐 HTTP</button><button data-dev="data">📋 Data viewer</button><button data-dev="projects">📦 Projects</button></div>
+  <p class="hint">By the team: lint Eight · tests Dyno · HTTP Forlor · diff Drop · SQL Get back · profile bot3 · data bot2help · outline bot2 · projects bot. Files stay under /home/pyodide (in-memory, reset when Python restarts).</p></div>
+ <div class="row"><button id="dv-clr">🧹 Clear</button></div>
+ <div id="dv-out" class="console"></div>
 </section>
 
 <!-- TOOLS -->
@@ -123,15 +151,17 @@
 </section>
 </main>
 
-<nav id="tabs"><button data-v="v-code" class="on"><span>⌨️</span>Code</button><button data-v="v-tools"><span>🧰</span>Tools</button><button data-v="v-fun"><span>🎮</span>Fun</button><button data-v="v-files"><span>📁</span>Files</button></nav>
+<nav id="tabs"><button data-v="v-code" class="on"><span>⌨️</span>Code</button><button data-v="v-repl"><span>&gt;_</span>REPL</button><button data-v="v-dev"><span>🛠</span>Dev</button><button data-v="v-tools"><span>🧰</span>Tools</button><button data-v="v-fun"><span>🎮</span>Fun</button><button data-v="v-files"><span>📁</span>Files</button></nav>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" integrity="sha384-ZYmwuq4n2gOcNxMSiJ6jyTj+BbIrilr7p6dlq6q5nmSWKmsH9UU4K1qqjycMkfmR" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js" integrity="sha384-Xy+2exU6lBoT4OpUOtnQb+cUpn+nlJQEHvRobWVtwz6wIsw4oNoO7xyd/l8rYgMy" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js" integrity="sha384-LjCI3E8qhhxXZvu7+FCvqx9eZYSowFvuJ7z54KsgI/BDPGKEuysqCg/vYiKHvC4Y" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js" integrity="sha384-69mJoUoPPF/C7qPs6lLjvXvrt6w225+rmxWqGO3a1glVjITdnnwPQOtG9FRTd2Ni" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js" integrity="sha384-ILkploZWukdp1VMmzMnE+32H0mgy2e+w29evc4grALGOqIRGBgbBGrwkX7a6zK7y" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js" integrity="sha384-qCnKPgNYgVO8RO19jShRRAfU75+KVnN1cQy+8CPX/TTwJsUEJ/EpnwKx2UOyLx8c" crossorigin="anonymous"></script>
 <script src="snippets.js"></script>
 <script src="app.js"></script>
 <script src="games.js"></script>
 <script src="github.js"></script>
+<script src="app4.js"></script>
 </body></html>
