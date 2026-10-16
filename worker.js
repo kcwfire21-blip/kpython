@@ -1,4 +1,7 @@
 // KPython v4 Python worker: Pyodide runs here so Stop can interrupt or kill it.
+// v9.1 (Get back H1): Python must never reach CacheStorage (it could plant app files that the SW serves cache-first).
+try{delete WorkerGlobalScope.prototype.caches}catch(e){}try{delete self.caches}catch(e){}
+if(typeof caches!=='undefined')throw new Error('KPython: could not lock CacheStorage away from Python; refusing to start');
 const PY='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
 importScripts(PY+'pyodide.js');
 // A Stop (KeyboardInterrupt) also rejects Pyodide's internal webloop promise; it is already handled by the run, so don't report it as uncaught.
@@ -36,7 +39,12 @@ async function init(m){PK=m.pkgs||[];SITES=Array.isArray(m.sites)?m.sites.map(St
   for(const p of (m.pkgs||[])){try{if(m.native.includes(p.toLowerCase()))await py.loadPackage(p.toLowerCase());else{await py.loadPackage('micropip');await py.pyimport('micropip').install(p)}}catch(err){post('out',{s:'Reinstall '+p+' failed (offline?)',c:'sys'})}}
  post('ready',{v:py.version,sab:useSAB,units:py.runPython('list(UNITS)').toJs()});
  // v9 perf: Dev tools load in parallel after ready (runs wait for them, see TOOLSP)
- TOOLSP=(async()=>{try{py.FS.mkdirTree('/home/pyodide/kptools');await Promise.all(m.tools.map(async f=>{const r=await fetch('tools/'+f);if(r.ok)py.FS.writeFile('/home/pyodide/kptools/'+f,await r.text())}))}catch(err){post('out',{s:'Dev tools load: '+err,c:'err'})}})()}
+ // v9.1 (Get back M1): tools live in /kptools on MEMFS (not the persistent ~), read-only, and only files the SW verified against its hash manifest are written.
+ TOOLSP=(async()=>{const bad=[];try{try{py.FS.mkdirTree('/kptools')}catch(e){}
+  const get=async f=>{const r=await fetch('tools/'+f);if(!r.ok||r.headers.get('X-KP-Verified')!=='1')throw new Error(r.status);return r.text()};
+  const res=await Promise.allSettled(m.tools.map(async f=>{let t;try{t=await get(f)}catch(e){t=await get(f)}py.FS.writeFile('/kptools/'+f,t);py.FS.chmod('/kptools/'+f,0o444)}));
+  res.forEach((r,i)=>{if(r.status==='rejected')bad.push(m.tools[i])});py.FS.chmod('/kptools',0o555)}catch(err){bad.push(String(err))}
+  if(bad.length)post('out',{s:'⚠️ Dev tools not loaded (missing or failed the integrity check): '+bad.join(', '),c:'err'})})()}
 let TOOLSP=null;
 async function prep(code){try{await py.loadPackagesFromImports(code,{messageCallback:s=>post('out',{s,c:'sys'})})}catch(e){post('out',{s:'Package load: '+e.message,c:'err'})}
  if(/\bmatplotlib\b/.test(code)){await py.runPythonAsync('import matplotlib');py.globals.get('_kp_mpl_patch')()}}

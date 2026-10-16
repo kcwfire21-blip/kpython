@@ -3,7 +3,11 @@ import sys, os, json, re, code, importlib, pydoc, io
 HOME = '/home/pyodide'
 os.chdir(HOME)
 if HOME not in sys.path: sys.path.insert(0, HOME)
-if HOME + '/kptools' not in sys.path: sys.path.append(HOME + '/kptools')
+KPTOOLS = '/kptools'  # v9.1: read-only, in-memory, hash-checked copies (no longer under the persistent ~)
+if KPTOOLS not in sys.path: sys.path.append(KPTOOLS)
+try:
+    import shutil as _sh0; _sh0.rmtree(HOME + '/kptools', ignore_errors=True)  # drop the old, Python-writable copy
+except Exception: pass
 _kp_user_mods = set()
 def _kp_modname(n):
     m = re.sub(r'\W+', '_', n.strip().lower().removesuffix('.py')).strip('_') or 'script'
@@ -49,7 +53,7 @@ def _kp_names():
     return json.dumps(sorted(set(keyword.kwlist + dir(builtins))))
 # Dev tab glue: one-tap tools load the team's (security-patched) modules from /home/pyodide/kptools
 def _kp_tool(mod):
-    sys.path.insert(0, HOME + '/kptools') if HOME + '/kptools' not in sys.path else None
+    sys.path.insert(0, KPTOOLS) if KPTOOLS not in sys.path else None
     return importlib.import_module(mod)
 def _kp_lint(src):
     _kp_tool('r2_eight_lint').report(src)

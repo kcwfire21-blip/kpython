@@ -173,8 +173,8 @@ $('f-new').onclick=()=>{const n=prompt('New script name?');if(n){newScript(n.tri
 async function offStatus(){const el=$('offstat');if(!('serviceWorker'in navigator)){el.textContent='⚠️ No offline';return}
  const reg=await navigator.serviceWorker.ready.catch(()=>null);const sw=navigator.serviceWorker.controller||reg?.active;if(!sw){el.textContent='…';return setTimeout(offStatus,3000)}
  const ch=new MessageChannel();const r=await new Promise(res=>{ch.port1.onmessage=e=>res(e.data);sw.postMessage({kpStatus:1},[ch.port2]);setTimeout(()=>res(null),4000)});
- if(r&&r.ok&&r.ver!==KP_APPV&&!window.kpUpdatePending&&(offStatus.n=(offStatus.n||0)+1)<10){el.textContent='⏳ Updating…';el.classList.remove('ok');el.title='Finishing the update to '+KP_APPV;return setTimeout(offStatus,3000)}
- if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=(r.ver===KP_APPV?'':'⚠️ page '+KP_APPV+' vs ')+'cache '+r.ver+': everything is cached'+(r.ver===KP_APPV?'':' (reload to finish updating)')}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
+ if(r&&r.ok&&!kpSameV(r.ver)&&!window.kpUpdatePending&&(offStatus.n=(offStatus.n||0)+1)<10){el.textContent='⏳ Updating…';el.classList.remove('ok');el.title='Finishing the update to '+KP_APPV;return setTimeout(offStatus,3000)}
+ if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=(kpSameV(r.ver)?'':'⚠️ page '+KP_APPV+' vs ')+'cache '+r.ver+': everything is cached'+(kpSameV(r.ver)?'':' (reload to finish updating)')}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
 offStatus();
 
 $('go-scan').onclick=e=>{e.preventDefault();showView('v-dev');DEV.secrets()};

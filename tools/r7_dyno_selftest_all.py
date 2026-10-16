@@ -1,7 +1,7 @@
 # Dyno: run every KPython tool's self-test with a per-tool timeout; catches failures, skips tools needing input, prints a PASS/FAIL/SKIP table and summary. Stdlib only.
 import os, sys, io, time, builtins, importlib.util, contextlib, traceback
 
-CANDIDATES = ["/home/pyodide/kptools", "/workspace/pyapp/tools"]  # KPython: the app loads tools into ~/kptools
+CANDIDATES = ["/kptools", "/workspace/pyapp/tools"]  # KPython: the app loads tools into ~/kptools
 TIMEOUT = 10.0
 NAMES = ("self_test", "selftest", "_self_test", "run_self_tests", "self_tests", "run_selftests")  # KPython: + bot2help naming
 SLOW = {"r6_bot3_bigo": 30.0, "r5_bot3_timeit": 20.0}  # KPython: extra headroom for timing tools

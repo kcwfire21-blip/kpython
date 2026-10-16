@@ -277,7 +277,7 @@ $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your p
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 
 refresh();renderTools();renderSnips();setupLock();
-const KP_APPV='kpython-v9';  // must match the cache name in sw.js
+const KP_APPV='kpython-v9.1';const kpSameV=v=>typeof v==='string'&&(v===KP_APPV||v.startsWith(KP_APPV+'-'));  // must match the cache name in sw.js
 if('serviceWorker'in navigator&&location.protocol.startsWith('http')){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{})})}).catch(()=>{});
  // v9: never reload by itself. Save the editor now and offer a "tap to reload" bar instead.
  const hadCtl=!!navigator.serviceWorker.controller;
