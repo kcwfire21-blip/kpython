@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id),LS=localStorage;
 const J=(k,d)=>{try{const v=JSON.parse(LS.getItem(k));return v??d}catch(e){return d}},S=(k,v)=>LS.setItem(k,JSON.stringify(v));
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>((+n||0)<0?'-$':'$')+Math.abs(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 // haptic-feel feedback
@@ -56,7 +56,7 @@ cm.on('focus',()=>setTimeout(placeKeybar,300));cm.on('blur',()=>setTimeout(place
 let outEl=null;
 function log(t,c){const o=outEl||$('out');const s=document.createElement('span');if(c)s.className=c;if(c==='err')linkify(s,t+'\n');else s.textContent=t+'\n';o.appendChild(s);o.scrollTop=o.scrollHeight}
 window.kpShowImg=b64=>{const i=new Image();i.src='data:image/png;base64,'+b64;(outEl||$('out')).appendChild(i)};
-$('clr').onclick=()=>$('out').textContent='';
+$('clr').onclick=()=>{if(inputMsg){dropOut=true;obuf=[];answerInput(null)}$('out').textContent=''};
 
 /* turtle target */
 let tuCanvas=null;
@@ -69,7 +69,7 @@ window.kpT=(op,...a)=>{if(!tuCanvas){tuCanvas=document.createElement('canvas');t
 function clearT(c){const x=c.getContext('2d');x.fillStyle=c.dataset.bg||'#010409';x.fillRect(0,0,c.width,c.height)}
 
 /* ---------- Python (v4: runs in a Web Worker so Stop works) ---------- */
-const TOOLS=['r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
+const TOOLS=['r4_eight_markdown.py','r4_dyno_coverage.py','r4_forlor_convert.py','r4_getback_secrets.py','r4_drop_packages.py','r4_bot3_memory.py','r4_bot2_katas.py','r4_bot2help_imports.py','r4_bot_docgen.py','r3_eight_format.py','r3_dyno_regex.py','r3_forlor_json.py','r3_getback_codec.py','r3_drop_history.py','r3_bot3_debugger.py','r3_bot2_snippets.py','r3_bot2help_metrics.py','r3_bot_typecheck.py','r2_eight_lint.py','r2_dyno_tests.py','r2_forlor_http.py','r2_drop_diff.py','r2_getback_sql.py','r2_bot3_profile.py','r2_bot2help_data.py','r2_bot2_outline.py','r2_bot_projects.py'];
 const modname=n=>{let m=n.trim().toLowerCase().replace(/\.py$/,'').replace(/\W+/g,'_').replace(/^_+|_+$/g,'')||'script';return /^\d/.test(m)?'_'+m:m};
 let W=null,running=false,SAB=null,INTR=null,CTL=null,DAT=null,pend={},seq=0,setupTxt=null,wsetupTxt=null,readyRes,pyReady,pyVer='';
 function newReady(){pyReady=new Promise(r=>readyRes=r)}newReady();
@@ -79,7 +79,7 @@ async function startWorker(){newReady();$('pystat').textContent='Loading Python�
  W=new Worker('worker.js');W.onmessage=onW;W.onerror=e=>log('Worker error: '+(e.message||e),'err');
  W.postMessage({cmd:'init',pkgs:J('kp_pkgs',[]),native:['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'],sab:SAB,setup:setupTxt,wsetup:wsetupTxt,tools:TOOLS})}
 /* batched plain stdout: one DOM write per frame, pane keeps the last MAXL lines */
-let obuf=[],oraf=0;const MAXL=5000;
+let obuf=[],oraf=0,dropOut=false;const MAXL=5000;
 function bufOut(s){obuf.push(s);if(!oraf)oraf=requestAnimationFrame(flushOut)}
 function flushOut(){if(oraf){cancelAnimationFrame(oraf);oraf=0}if(!obuf.length)return;const o=outEl||$('out');const t=obuf.join('\n')+'\n';obuf=[];
  const s=document.createElement('span');s.textContent=t;o.appendChild(s);trimOut(o);o.scrollTop=o.scrollHeight}
@@ -87,19 +87,20 @@ function trimOut(o){let n=0;for(const c of o.childNodes)if(!c.classList?.contain
  while(n>MAXL&&o.firstChild){const c=o.firstChild;const k=(c.textContent.match(/\n/g)||[]).length;if(n-k<MAXL&&c.nodeType===1&&c.tagName==='SPAN'){const ls=c.textContent.split('\n');c.textContent=ls.slice(n-MAXL).join('\n');n=MAXL;break}n-=k;c.remove()}
  if(n>=MAXL){o.querySelector('.trimnote')?.remove();const s=document.createElement('span');s.className='sys trimnote';s.textContent='(older output trimmed to last '+MAXL+' lines)\n';o.prepend(s)}}
 function onW(e){const m=e.data;
- if(m.t==='out'&&!m.c){bufOut(m.s);return}flushOut();
+ if(m.t==='out'&&dropOut)return;if(m.t==='out'&&!m.c){bufOut(m.s);return}flushOut();
  if(m.t==='out')log(m.s,m.c);else if(m.t==='img')kpShowImg(m.b);else if(m.t==='turtle')kpT(...m.a);
  else if(m.t==='input')askInput(m);
+ else if(m.t==='pkgs'){const l=Array.isArray(m.l)?m.l.filter(s=>typeof s==='string'&&/^[\w.\-\[\]=<>]{1,120}$/.test(s)):[];S('kp_pkgs',l)}
  else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');
   $('c-unit').innerHTML=m.units.map(k=>`<option>${esc(k)}</option>`).join('');readyRes();setRunBtns();log('Python '+m.v+' ready'+(m.sab?'':' (compat mode: Stop restarts Python)'),'sys')}
  else if(m.t==='fail'){$('pystat').textContent='Python offline';$('run').textContent='Python failed to load';log(m.s,'err')}
- else if(m.t==='done'){const p=pend[m.id];delete pend[m.id];if(p)p(m)}}
+ else if(m.t==='done'){dropOut=false;const p=pend[m.id];delete pend[m.id];if(p)p(m)}}
 function wcall(msg){return new Promise(res=>{const id=++seq;pend[id]=res;W.postMessage({...msg,id})})}
 function allFiles(){if(cur)scripts[cur]=cm.getValue();return scripts}
 /* inline input() box inside the output area */
 let inputMsg=null;
 function askInput(m){inputMsg=m;const o=outEl||$('out');const row=document.createElement('div');row.className='inrow';
- row.innerHTML='<span class="inp"></span><input autocapitalize="off" autocorrect="off" spellcheck="false"><button class="pri">↵</button><button>✕</button>';row.querySelector('.inp').textContent=m.p||'input:';
+ row.innerHTML='<span class="inp">›</span><input autocapitalize="off" autocorrect="off" spellcheck="false"><button class="pri">↵</button><button>✕</button>';
  o.appendChild(row);const inp=row.querySelector('input');const fin=v=>{row.remove();answerInput(v)};
  inp.onkeydown=e=>{if(e.key==='Enter')fin(inp.value)};row.querySelectorAll('button')[0].onclick=()=>fin(inp.value);row.querySelectorAll('button')[1].onclick=()=>fin(null);
  setTimeout(()=>{inp.focus();row.scrollIntoView({block:'nearest'})},30)}
@@ -115,8 +116,8 @@ function setRunBtns(){const busy=running;$('run').disabled=busy;$('run').textCon
 async function job(msg,{target=null,turtle=null}={}){await pyReady;if(running){toast('Python is busy. Tap ⏹ Stop first.');return {ok:false}}running=true;setRunBtns();outEl=target;tuCanvas=turtle;
  try{const r=await wcall(msg);if(!r.ok&&r.err)log(r.err,'err');return r}finally{outEl=null;tuCanvas=null;running=false;setRunBtns()}}
 async function runPy(code,o={}){const r=await job({cmd:'run',code,files:allFiles(),fname:'__kp_run__.py'},o);return r.ok}
-async function run(){scripts[cur]=cm.getValue();persist();clearErr();log('— run '+cur+' —','sys');const t0=performance.now();
- const r=await job({cmd:'run',code:cm.getValue(),files:allFiles(),fname:modname(cur)+'.py'});log(`— ${r.ok?'done':'error'} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys')}
+async function run(){try{cm.display.input.forceCompositionEnd?.();cm.display.input.poll?.()}catch(e){}clearTimeout(dirtyT);if(typeof setDirty==='function')setDirty(false);scripts[cur]=cm.getValue();persist();clearErr();log('— run '+cur+' —','sys');const t0=performance.now();
+ const r=await job({cmd:'run',code:cm.getValue(),files:allFiles(),fname:modname(cur)+'.py'});log(`— ${r.ok?'done':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'stopped':'error')} in ${((performance.now()-t0)/1000).toFixed(2)}s —`,'sys')}
 $('run').onclick=run;$('stop').onclick=stopPy;$('stopbtn').onclick=stopPy;
 async function pycall(fn,...args){await pyReady;if(running)return 'Python is busy (tap ⏹ Stop).';const r=await wcall({cmd:'call',fn,args});return r.ok?r.r:'Error: '+r.err}
 function toast(t){log(t,'sys')}
@@ -197,7 +198,7 @@ $('sn-filter').onchange=renderSnips;
 /* backup */
 const DATA_KEYS=['kp_hours','kp_budget','kp_miles','kp_rate','kp_mrate','kp_turtle','kp_hi','kp_pkgs'];
 function exportData(){if(cur)scripts[cur]=cm.getValue();persist();const d={app:'KPython',version:2,exported:new Date().toISOString(),scripts,cur,data:{}};DATA_KEYS.forEach(k=>{const v=LS.getItem(k);if(v!==null)d.data[k]=v});return d}
-$('bk-exp').onclick=async()=>{const txt=JSON.stringify(exportData(),null,1),name=`kpython-backup-${today()}.json`;const file=new File([txt],name,{type:'application/json'});
+$('bk-exp').onclick=async()=>{const bd=exportData();try{const h=await pycall('_kp_hist_dump');if(typeof h==='string'&&h.startsWith('{'))bd.history=JSON.parse(h)}catch(e){}const txt=JSON.stringify(bd,null,1),name=`kpython-backup-${today()}.json`;const file=new File([txt],name,{type:'application/json'});
  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});$('bk-msg').textContent='Shared '+name;return}catch(e){if(e.name==='AbortError')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();$('bk-msg').textContent='Downloaded '+name};
 const VALID={kp_hours:x=>Array.isArray(x)&&x.every(s=>s&&/^\d{4}-\d\d-\d\d$/.test(s.date)&&/^\d\d:\d\d$/.test(s.start)&&/^\d\d:\d\d$/.test(s.end)&&isFinite(s.rate)&&isFinite(s.id)),
@@ -208,7 +209,7 @@ function validKey(k,v){if(typeof v!=='string')return false;if(!VALID[k])return t
 function importData(d){if(!d||d.app!=='KPython'||typeof d.scripts!=='object'||Array.isArray(d.scripts)||!Object.values(d.scripts).every(v=>typeof v==='string'))throw new Error('Not a valid KPython backup');
  scripts={...scripts,...d.scripts};cur=d.cur in scripts?d.cur:cur;const bad=[];Object.entries(d.data||{}).forEach(([k,v])=>{if(DATA_KEYS.includes(k)){if(validKey(k,v))LS.setItem(k,v);else bad.push(k)}});if(bad.length)alert('Skipped invalid data: '+bad.join(', '));refresh();renderTools();renderFiles();return Object.keys(d.scripts).length}
 $('bk-imp').onclick=()=>$('bk-file').click();
-$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
+$('bk-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!confirm('Import this backup? Scripts with the same name will be replaced and tool data overwritten.'))return;$('bk-msg').textContent=`Imported ${importData(d)} scripts + tool data.`;if(d.history&&typeof d.history==='object'){const n=await pycall('_kp_hist_load',JSON.stringify(d.history));$('bk-msg').textContent+=` ${+n||0} history files.`};toast2($('bk-msg').textContent)}catch(err){$('bk-msg').textContent='Import failed: '+err.message}e.target.value=''};
 $('bk-reset').onclick=()=>{if(!confirm('Erase ALL scripts and tool data? (Your passcode stays.) Export a backup first!'))return;if(prompt('Type RESET to confirm')!=='RESET')return;
  DATA_KEYS.forEach(k=>LS.removeItem(k));scripts={...STARTERS};cur=Object.keys(scripts)[0];refresh();renderTools();renderFiles();$('bk-msg').textContent='All data reset.'};
 

@@ -76,7 +76,7 @@ def main():
             else:
                 print("Pick 1, 2, 3, or q.")
         except Exception as e:
-            print(f"Error: {type(e).__name__}: {e}")
+            print("Cancelled." if str(e) == "cancelled" else f"Error: {type(e).__name__}: {e}")
 
 if __name__ == "__main__":
     main()

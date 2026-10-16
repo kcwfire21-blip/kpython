@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://cdn.jsdelivr.net; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://cdn.jsdelivr.net/pyodide/v0.26.4/full/ https://pypi.org https://files.pythonhosted.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Keivon's Python</title>
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
@@ -12,7 +12,7 @@
 </head><body>
 <div id="lock"><div class="logo">🐍</div><h2>Keivon's Python</h2><div id="lmsg"></div><input id="pin" type="password" inputmode="numeric" autocomplete="off"><button id="lbtn" class="pri">Unlock</button></div>
 
-<header id="top"><h1>🐍 KPython</h1><span id="pystat" class="pill">Loading Python…</span><button id="stopbtn" class="danger" hidden title="Stop Python">⏹</button><button id="lockbtn" title="Lock">🔒</button></header>
+<header id="top"><h1>🐍 KPython</h1><span id="pystat" class="pill">Loading Python…</span><span id="offstat" class="pill" title="Offline status">…</span><button id="stopbtn" class="danger" hidden title="Stop Python">⏹</button><button id="lockbtn" title="Lock">🔒</button></header>
 
 <main>
 <!-- CODE -->
@@ -47,10 +47,10 @@
 <!-- DEV -->
 <section id="v-dev" class="view">
  <div class="card"><h3>Current script</h3><p class="hint">Works on the script open in the Code tab.</p>
-  <div class="g2"><button data-dev="lint" class="pri">🧹 Lint</button><button data-dev="tests" class="pri">✅ Run tests</button><button data-dev="outline">🗂 Outline</button><button data-dev="rename">✏️ Rename…</button><button data-dev="profile">⏱ Profile</button><button data-dev="bench">📊 Benchmark</button><button data-dev="format" class="pri">✨ Format</button><button data-dev="debug" class="pri">🐞 Debug</button><button data-dev="metrics">📏 Metrics</button><button data-dev="types">🔤 Type check</button><button data-dev="snap">🕘 Save version</button><button data-dev="history">📜 History</button></div></div>
+  <div class="g2"><button data-dev="lint" class="pri">🧹 Lint</button><button data-dev="tests" class="pri">✅ Run tests</button><button data-dev="outline">🗂 Outline</button><button data-dev="rename">✏️ Rename…</button><button data-dev="profile">⏱ Profile</button><button data-dev="bench">📊 Benchmark</button><button data-dev="format" class="pri">✨ Format</button><button data-dev="debug" class="pri">🐞 Debug</button><button data-dev="metrics">📏 Metrics</button><button data-dev="types">🔤 Type check</button><button data-dev="snap">🕘 Save version</button><button data-dev="history">📜 History</button><button data-dev="docgen" class="pri">📝 Docstrings</button><button data-dev="cover" class="pri">🧪 Coverage</button><button data-dev="memory">🧠 Memory</button><button data-dev="secrets">🔑 Secret scan</button><button data-dev="imports">🕸 Import map</button><button data-dev="markdown">📄 Markdown preview</button></div><iframe id="dv-md" sandbox="" hidden style="width:100%;height:300px;border:1px solid #30363d;border-radius:12px;background:#0d1117;margin-top:8px"></iframe></div>
  <div class="card"><h3>Diff two scripts</h3><div class="g2"><select id="dv-a"></select><select id="dv-b"></select></div><div class="row"><label class="ck"><input type="checkbox" id="dv-side"> Side by side</label><button data-dev="diff" class="pri">Compare</button><button data-dev="patch">Patch…</button></div></div>
- <div class="card"><h3>Tools</h3><div class="g2"><button data-dev="sql">🗄 SQL</button><button data-dev="http">🌐 HTTP</button><button data-dev="data">📋 Data viewer</button><button data-dev="projects">📦 Projects</button><button data-dev="regex">🔎 Regex</button><button data-dev="json">🧾 JSON</button><button data-dev="codec">🔐 Encode/Hash</button><button data-dev="templates">🧩 Templates</button></div>
-  <p class="hint">By the team: lint Eight · tests Dyno · HTTP Forlor · diff Drop · SQL Get back · profile bot3 · data bot2help · outline bot2 · projects bot · format Eight · regex Dyno · JSON Forlor · encode/hash Get back · history Drop · debugger bot3 · templates bot2 · metrics bot2help · type check bot. Files stay under /home/pyodide (in-memory, reset when Python restarts).</p></div>
+ <div class="card"><h3>Tools</h3><div class="g2"><button data-dev="sql">🗄 SQL</button><button data-dev="http">🌐 HTTP</button><button data-dev="data">📋 Data viewer</button><button data-dev="projects">📦 Projects</button><button data-dev="regex">🔎 Regex</button><button data-dev="json">🧾 JSON</button><button data-dev="codec">🔐 Encode/Hash</button><button data-dev="templates">🧩 Templates</button><button data-dev="convert">🔁 Convert config</button><button data-dev="katas">🥋 Katas</button><button data-dev="packages">📦 Packages</button></div>
+  <p class="hint">By the team: lint Eight · tests Dyno · HTTP Forlor · diff Drop · SQL Get back · profile bot3 · data bot2help · outline bot2 · projects bot · format Eight · regex Dyno · JSON Forlor · encode/hash Get back · history Drop · debugger bot3 · templates bot2 · metrics bot2help · type check bot · markdown Eight · coverage Dyno · convert Forlor · secret scan Get back · packages Drop · memory bot3 · katas bot2 · import map bot2help · docstrings bot. Files stay under /home/pyodide (in-memory, reset when Python restarts).</p></div>
  <div class="row"><button id="dv-clr">🧹 Clear</button></div>
  <div id="dv-out" class="console"></div>
 </section>
@@ -105,7 +105,7 @@
   <h3>GitHub</h3>
   <div id="gh-status" class="hint">Not logged in. Public repos can be read without logging in.</div>
   <details id="gh-logbox"><summary>🔑 Log in (for private repos &amp; push)</summary>
-   <p class="hint">Use a <b>fine-grained token</b> limited to specific repos, with <b>Contents: Read and write</b> only and a <b>30-day expiry</b>. Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>.<br>The token stays in memory only. It's never saved, and it's wiped when you lock the app, reload, or log out. Python scripts can't read it.</p>
+   <p class="hint">Use a <b>fine-grained personal access token</b> limited to <b>only the specific repos</b> you need, with <b>Contents: Read and write</b> as the only permission and a <b>30-day expiry</b>. Never use a classic token. Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>.<br>The token stays in memory only. It's never saved, and it's wiped when you lock the app, reload, or log out. Python scripts can't read it.</p>
    <div class="row"><input id="gh-tok" type="password" autocomplete="off" autocapitalize="off" placeholder="github_pat_…"><button id="gh-login" class="pri">Log in</button></div>
   </details>
   <div class="row"><button id="gh-logout" hidden>Log out</button></div>
@@ -144,10 +144,10 @@
 <section id="v-files" class="view">
  <div class="card"><div class="row"><h3 style="flex:1;margin:0">My Scripts</h3><button id="f-new" class="pri">＋ New</button><button id="f-imp">📥 Import .py</button></div><div id="f-list"></div></div>
  <div class="card"><h3>📚 Snippets</h3><select id="sn-filter"><option value="">All</option></select><div id="snip-list"></div></div>
- <div class="card"><h3>Backup</h3><p class="hint">Exports every script and all tool data (not your passcode) to a JSON file.</p>
+ <div class="card"><h3>Backup</h3><p class="hint">Exports every script, all tool data and History versions (not your passcode) to a JSON file.</p>
   <div class="row"><button id="bk-exp" class="pri">⬇️ Export</button><button id="bk-imp">⬆️ Import</button><input id="bk-file" type="file" accept=".json,application/json" hidden></div>
   <button id="bk-reset" class="danger">Reset all data…</button><div id="bk-msg" class="hint"></div></div>
- <div class="card hint">Python runs fully on this phone (Pyodide). Nothing is uploaded. The passcode only blocks casual snooping on this device.</div>
+ <div class="card hint">Python runs fully on this phone (Pyodide). Nothing is uploaded. The passcode only hides the screen; it does <b>not</b> encrypt anything.<br>⚠️ <b>Don't paste passwords or tokens into scripts.</b> Scripts, console history and History versions are stored as plain text on this phone. Check with <a href="#" id="go-scan">Dev ▸ 🔑 Secret scan</a>.</div>
 </section>
 </main>
 

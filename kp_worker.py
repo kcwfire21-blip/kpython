@@ -3,6 +3,7 @@ import sys, os, json, re, code, importlib, pydoc, io
 HOME = '/home/pyodide'
 os.chdir(HOME)
 if HOME not in sys.path: sys.path.insert(0, HOME)
+if HOME + '/kptools' not in sys.path: sys.path.append(HOME + '/kptools')
 _kp_user_mods = set()
 def _kp_modname(n):
     m = re.sub(r'\W+', '_', n.strip().lower().removesuffix('.py')).strip('_') or 'script'
@@ -121,3 +122,61 @@ def _kp_snapshot(name, src, msg):
     with open(safe_path(rel), 'w') as f: f.write(src)
     m.save_version(rel, msg or 'snapshot from KPython')
     m.list_versions(rel)
+
+# ---- v6: History versions in backups (/home/pyodide/.history) ----
+_KP_HIST = os.path.join(HOME, '.history')
+def _kp_hist_dump():
+    out = {}
+    if os.path.isdir(_KP_HIST):
+        for r, _, fs in os.walk(_KP_HIST):
+            for f in fs:
+                p = os.path.join(r, f)
+                if os.path.getsize(p) <= 1_000_000:
+                    with open(p, encoding='utf-8', errors='replace') as fh: out[os.path.relpath(p, _KP_HIST)] = fh.read()
+    return json.dumps(out)
+def _kp_hist_load(data_json):
+    data = json.loads(data_json); n = 0
+    if not isinstance(data, dict): return 0
+    for rel, txt in list(data.items())[:5000]:
+        if not isinstance(rel, str) or not isinstance(txt, str) or len(txt) > 1_000_000: continue
+        full = os.path.realpath(os.path.join(_KP_HIST, rel))
+        if not full.startswith(_KP_HIST + '/'): continue
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, 'w', encoding='utf-8') as fh: fh.write(txt)
+        n += 1
+    return n
+
+# ---- v6: round-4 team tools ----
+def _kp_cover(src):
+    m = _kp_tool('r4_dyno_coverage'); print("Coverage (Dyno). This runs your code and its unittest tests.")
+    exe, hits = m.cover(src, 'pass' if 'TestCase' in src else ''); print('\n'.join(m.report(src, exe, hits)))
+def _kp_memory(src):
+    m = _kp_tool('r4_bot3_memory')
+    if m.tracemalloc is None: return
+    print("Memory profile (bot3). This runs your code."); m.report(m.profile_source(src))
+def _kp_docgen(src):
+    new, n = _kp_tool('r4_bot_docgen').generate(src); return new
+def _kp_secrets(files_json):
+    m = _kp_tool('r4_getback_secrets'); files = json.loads(files_json); found = []
+    for name, text in files.items():
+        for ln, kind, sev, masked, fix in m.scan_text(text):
+            found.append((name, ln, kind, sev, masked, fix))
+    found.sort(key=lambda x: (m.SEV_ORDER[x[3]], x[0], x[1]))
+    print(f"Secret scan (Get back) of {len(files)} saved script(s). Values are masked.")
+    m.report(found, [])
+def _kp_markdown(text):
+    return _kp_tool('r4_eight_markdown').to_html(text)
+def _kp_imports():
+    m = _kp_tool('r4_bot2help_imports')
+    import tempfile, shutil
+    print("Import map of your saved scripts (bot2help).")
+    import shutil
+    d = os.path.join(HOME, '.kp_imap'); shutil.rmtree(d, ignore_errors=True); os.makedirs(d)
+    for mod in sorted(_kp_user_mods):
+        src = os.path.join(HOME, mod + '.py')
+        if os.path.exists(src): shutil.copy(src, os.path.join(d, mod + '.py'))
+    print(m.report(m.build_map(d)))
+# Drop's package manager reads/writes the app's reinstall list through these hooks
+def kp_pkgs_get(): return list(json.loads(js.kpPkgsGet()))
+def kp_pkgs_set(lst): js.kpPkgsSet(json.dumps(list(lst)))
+builtins.kp_pkgs_get, builtins.kp_pkgs_set = kp_pkgs_get, kp_pkgs_set

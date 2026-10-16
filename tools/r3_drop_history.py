@@ -369,7 +369,7 @@ def menu_history():
     path = input("File (inside ~): ").strip()
     safe_path(path)  # validate early
     while True:
-        c = input(f"\n[{path}] s Save  l List  d Diff  r Restore  b Back: ").strip().lower()
+        c = input(f"\n[{path}] s Save  l List  d Diff  r Restore  b Back  q Quit: ").strip().lower()
         try:
             if c == "s":
                 save_version(path, input("Message (optional): "))
@@ -381,7 +381,7 @@ def menu_history():
                 diff(path, va, parse_vid(other) if other else None)
             elif c == "r":
                 restore(path, parse_vid(input("Restore which version: ")))
-            elif c == "b":
+            elif c in ("b", "q", "quit"):
                 return
             else:
                 print("Pick s, l, d, r or b.")

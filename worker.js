@@ -9,10 +9,11 @@ self.kpShowImg=b=>post('img',{b});
 self.prompt=function(p){p=String(p??'');
  if(useSAB){Atomics.store(ctl,0,0);post('input',{p,mode:'sab'});Atomics.wait(ctl,0,0);
   const st=Atomics.load(ctl,0);if(st<0)return null;const n=Atomics.load(ctl,1);return new TextDecoder().decode(dat.slice(0,n))}
- const id=Math.random().toString(36).slice(2);post('input',{p,mode:'xhr',id});
+ const id=crypto.randomUUID();post('input',{p,mode:'xhr',id});
  const x=new XMLHttpRequest();x.open('GET','./__kp_input?id='+id,false);x.send(null);
  if(x.status!==200)return null;const r=JSON.parse(x.responseText);return r.cancel?null:r.v};
-async function init(m){
+let PK=[];self.kpPkgsGet=()=>JSON.stringify(PK);self.kpPkgsSet=j=>{PK=JSON.parse(j);post('pkgs',{l:PK})};
+async function init(m){PK=m.pkgs||[];
  if(m.sab){useSAB=true;intr=new Uint8Array(m.sab,0,1);ctl=new Int32Array(m.sab,4,2);dat=new Uint8Array(m.sab,12)}
  py=await loadPyodide({stdout:t=>post('out',{s:t}),stderr:t=>post('out',{s:t,c:'err'})});
  if(intr)py.setInterruptBuffer(intr);

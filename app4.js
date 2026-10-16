@@ -47,7 +47,8 @@ $('e-file').onchange=async e=>{for(const f of e.target.files){if(f.size>2e6){log
 const RH=J('kp_rhist',[]);let rhi=RH.length,rbuf=[];
 function rlog(t,c){const s=document.createElement('span');if(c)s.className=c;s.textContent=t+'\n';$('r-out').appendChild(s);$('r-out').scrollTop=1e9}
 async function replSend(){const src=$('r-in').value;if(running)return toast('Python is busy');const lines=src.split('\n');$('r-in').value='';
- if(src.trim()){RH.push(src);if(RH.length>200)RH.shift();S('kp_rhist',RH)}rhi=RH.length;
+ const TOKRE=/(eyJ[\w-]+\.[\w-]+\.[\w-]*|gh[pousr]_\w{20,}|github_pat_\w{20,}|sk-[\w-]{16,}|AKIA[0-9A-Z]{16}|xox[abprs]-[\w-]{10,}|(authorization|password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+)/i;
+ if(src.trim()&&!TOKRE.test(src)){RH.push(src);if(RH.length>200)RH.shift();S('kp_rhist',RH)}rhi=RH.length;
  for(const ln of lines){rlog(($('r-ps').textContent)+' '+ln,'echo');const r=await job({cmd:'repl',line:ln,files:allFiles()},{target:$('r-out')});
   $('r-ps').textContent=r.more?'...':'>>>';if(!r.ok)break}
  if(lines.length>1&&$('r-ps').textContent==='...'){const r=await job({cmd:'repl',line:'',files:allFiles()},{target:$('r-out')});$('r-ps').textContent=r.more?'...':'>>>'}
@@ -58,7 +59,7 @@ $('r-in').onkeydown=e=>{const ta=e.target;
  else if(e.key==='ArrowUp'&&!ta.value.slice(0,ta.selectionStart).includes('\n')){if(rhi>0){e.preventDefault();ta.value=RH[--rhi]}}
  else if(e.key==='ArrowDown'&&!ta.value.slice(ta.selectionEnd).includes('\n')){e.preventDefault();rhi=Math.min(RH.length,rhi+1);ta.value=RH[rhi]||''}};
 $('r-up').onclick=()=>{if(rhi>0)$('r-in').value=RH[--rhi]};$('r-down').onclick=()=>{rhi=Math.min(RH.length,rhi+1);$('r-in').value=RH[rhi]||''};
-$('r-clr').onclick=()=>$('r-out').textContent='';
+$('r-clr').onclick=()=>{if(inputMsg){dropOut=true;obuf=[];answerInput(null)}$('r-out').textContent=''};
 $('r-reset').onclick=async()=>{if(!confirm('Clear all console variables?'))return;await job({cmd:'call',fn:'_kp_repl_reset',args:[]});$('r-ps').textContent='>>>';rlog('Console reset.','sys')};
 /* ---- Docs ---- */
 const QREF={'str':"s.split(sep) s.join(list) s.strip() s.replace(a,b) s.find(x) s.startswith(x) s.upper()/lower() f\"{x:,.2f}\" s.splitlines() s.isdigit()",
@@ -79,7 +80,7 @@ $('d-q').onkeydown=e=>{if(e.key==='Enter')$('d-go').click()};
 document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.textContent;$('d-go').click()});
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
-async function dev(label,code){devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':'— stopped/error —')+'\n';t.appendChild(s);return r}
+async function dev(label,code){devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+code,files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
 const DEV={
@@ -107,11 +108,24 @@ const DEV={
  json:()=>dev('JSON','import r3_forlor_json as m; m.main()'),
  codec:()=>dev('Encode/Hash','import r3_getback_codec as m; m.main()'),
  templates:()=>dev('Templates','import r3_bot2_snippets as m; m.main()'),
+ cover:()=>!confirm(`Coverage runs "${cur}" and its tests. Continue?`)?(devOut().textContent='Cancelled.'):dev('Coverage '+cur,`_kp_cover(${J2(curSrc())})`),
+ memory:()=>!confirm(`Memory profile runs "${cur}". Continue?`)?(devOut().textContent='Cancelled.'):dev('Memory '+cur,`_kp_memory(${J2(curSrc())})`),
+ docgen:async()=>{const src=curSrc();const r=await pycall('_kp_docgen',src);if(typeof r!=='string'||r.startsWith('Error')){devOut().textContent=String(r);return}
+  if(r===src){devOut().textContent='Every function already has a docstring.';return}await dev('Docstrings preview',`_kp_diff(${J2(src)}, ${J2(r)}, 'before', 'after', False)`);
+  if(confirm('Add these docstrings to "'+cur+'"? (Undo with ↶)')){cm.replaceRange(r,{line:0,ch:0},{line:cm.lastLine()});scripts[cur]=r;persist();devOut().append('\nApplied.')}else devOut().append('\nCancelled.')},
+ secrets:()=>dev('Secret scan',`_kp_secrets(${J2(JSON.stringify(allFiles()))})`),
+ imports:()=>dev('Import map','_kp_imports()'),
+ markdown:async()=>{const html=await pycall('_kp_markdown',curSrc());const box=$('dv-md');
+  // Eight's renderer escapes all raw HTML; it is still shown in a fully sandboxed iframe (no scripts, no same-origin) as a second layer.
+  box.hidden=false;box.srcdoc='<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data: https:"><style>body{font:15px -apple-system,sans-serif;color:#e6edf3;background:#0d1117;padding:8px}pre,code{background:#161b22;border-radius:6px}pre{padding:8px;overflow:auto}a{color:#58a6ff}table{border-collapse:collapse}td,th{border:1px solid #30363d;padding:4px}</style>'+String(html);devOut().textContent='Markdown preview of "'+cur+'" below.'},
+ convert:()=>dev('Convert','import r4_forlor_convert as m; m.main()'),
+ katas:()=>dev('Katas','import r4_bot2_katas as m; m.main()'),
+ packages:()=>dev('Packages','import r4_drop_packages as m\nawait m.amain()'),
  patch:()=>dev('Diff & patch','import r2_drop_diff as m; m.main()')};
 document.querySelectorAll('[data-dev]').forEach(b=>b.onclick=()=>{if(running)return toast('Python is busy (tap ⏹ Stop)');DEV[b.dataset.dev]()});
 function devSelects(){const o=Object.keys(scripts).map(n=>`<option>${esc(n)}</option>`).join('');['dv-a','dv-b'].forEach((id,i)=>{const v=$(id).value;$(id).innerHTML=o;$(id).value=v&&v in scripts?v:Object.keys(scripts)[Math.min(i,Object.keys(scripts).length-1)]})}
 window.addEventListener('click',e=>{if(e.target.closest('#tabs [data-v="v-dev"]'))devSelects()});devSelects();
-$('dv-clr').onclick=()=>devOut().textContent='';
+$('dv-clr').onclick=()=>{if(inputMsg){dropOut=true;obuf=[];answerInput(null)}devOut().textContent=''};
 /* ---- cross-origin isolation (SharedArrayBuffer for Stop + input) ---- */
 if('serviceWorker'in navigator&&isSecureContext){
  if(!self.crossOriginIsolated&&!sessionStorage.kp_coi){if(navigator.serviceWorker.controller){sessionStorage.kp_coi=1;location.reload()}
@@ -131,3 +145,12 @@ const HINTS=[[/IndentationError|TabError/,'Hint: the spaces at the start of a li
 const _log=log;log=function(t,c){_log(t,c);if(c==='err'){for(const [re,h] of HINTS){const m=String(t).match(re);if(m){_log(typeof h==='function'?h(m):h,'ehint');break}}}};
 
 $('f-new').onclick=()=>{const n=prompt('New script name?');if(n){newScript(n.trim()||'script','print("hi")\n');showView('v-code')}};$('f-imp').onclick=()=>$('e-file').click();
+
+/* v6: offline-ready indicator (asks the service worker whether every app + Python file is cached) */
+async function offStatus(){const el=$('offstat');if(!('serviceWorker'in navigator)){el.textContent='⚠️ No offline';return}
+ const reg=await navigator.serviceWorker.ready.catch(()=>null);const sw=navigator.serviceWorker.controller||reg?.active;if(!sw){el.textContent='…';return setTimeout(offStatus,3000)}
+ const ch=new MessageChannel();const r=await new Promise(res=>{ch.port1.onmessage=e=>res(e.data);sw.postMessage({kpStatus:1},[ch.port2]);setTimeout(()=>res(null),4000)});
+ if(r&&r.ok){el.textContent='✈️ Offline ready';el.classList.add('ok');el.title=r.ver+': everything is cached'}else{el.textContent=navigator.onLine?'⏳ Caching…':'⚠️ Offline (partial)';el.classList.remove('ok');el.title=r?r.missing+' files not cached yet':'no answer';setTimeout(offStatus,5000)}}
+offStatus();
+
+$('go-scan').onclick=e=>{e.preventDefault();showView('v-dev');DEV.secrets()};

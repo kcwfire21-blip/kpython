@@ -120,7 +120,10 @@ def main():
                 if c == "3": tree(p)
                 elif c == "4": run(p, input("Entry file [main.py]: ").strip() or "main.py")
                 elif c == "5": zip_project(p)
-                elif c == "8" and input(f"Delete {p}? type yes: ") == "yes": shutil.rmtree(path(p)); print("Deleted.")
+                elif c == "8" and input(f"Delete {p}? type yes: ") == "yes":
+                    d = os.path.realpath(path(p))
+                    if not d.startswith(os.path.realpath(ROOT) + os.sep): raise ValueError("refused: outside projects folder")
+                    shutil.rmtree(d); print("Deleted.")
             elif c == "6": unzip(input("Zip file path: ").strip(), input("Project name (enter = zip name): ").strip() or None)
             elif c == "7": import_github(input("owner/repo or URL: "), input("Branch/tag (enter = default): ").strip())
         except Exception as e: print("Error:", e)

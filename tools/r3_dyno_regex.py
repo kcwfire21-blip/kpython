@@ -53,8 +53,8 @@ def self_test():
 def main():
     print("== Regex Tester ==  (type ? for cheat sheet, t for self-test)")
     while True:
-        p = input("\nPattern (blank to quit): ")
-        if not p: break
+        p = input("\nPattern (blank or q to quit): ")
+        if not p or p.strip().lower() in ("q", "quit"): break
         if p == "?": print(CHEAT); continue
         if p == "t": self_test(); continue
         try:

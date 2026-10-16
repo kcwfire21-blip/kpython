@@ -174,7 +174,8 @@ def main():
                 hits = search(input("Search: "))
                 print("\n".join(f"{k:14} {SNIPPETS[k][0]}" for k in hits) or "No matches.")
             elif c == "3":
-                k = input("Snippet name: ").strip()
+                k = input("Snippet name or number: ").strip()
+                if k.isdigit() and 1 <= int(k) <= len(SNIPPETS): k = list(SNIPPETS)[int(k) - 1]  # KPython: accept list index
                 print(SNIPPETS[k][2] if k in SNIPPETS else "Unknown snippet.")
             elif c == "4":
                 keys = [k.strip() for k in input("Snippet names (comma-separated): ").split(",") if k.strip()]
