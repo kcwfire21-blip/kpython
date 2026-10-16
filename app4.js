@@ -117,3 +117,5 @@ const HINTS=[[/IndentationError|TabError/,'Hint: the spaces at the start of a li
  [/KeyError|IndexError/,"Hint: the key or position you asked for isn't in that dict/list."],
  [/ZeroDivisionError/,'Hint: something was divided by zero.']];
 const _log=log;log=function(t,c){_log(t,c);if(c==='err'){for(const [re,h] of HINTS){const m=String(t).match(re);if(m){_log(typeof h==='function'?h(m):h,'ehint');break}}}};
+
+$('f-new').onclick=()=>{const n=prompt('New script name?');if(n){newScript(n.trim()||'script','print("hi")\n');showView('v-code')}};$('f-imp').onclick=()=>$('e-file').click();

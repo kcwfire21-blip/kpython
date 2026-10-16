@@ -34,10 +34,11 @@ const persist=()=>{LS.setItem('kp_scripts',JSON.stringify(scripts));LS.setItem('
 
 const cm=CodeMirror.fromTextArea($('code'),{mode:'python',theme:'dracula',lineNumbers:true,indentUnit:4,tabSize:4,smartIndent:true,matchBrackets:true,autoCloseBrackets:true,lineWrapping:false,inputStyle:'contenteditable',
  extraKeys:{Tab:c=>c.somethingSelected()?c.indentSelection('add'):c.replaceSelection('    '),'Shift-Tab':c=>c.indentSelection('subtract'),'Ctrl-Enter':()=>run(),'Cmd-Enter':()=>run()}});
-let dirtyT;cm.on('change',()=>{clearTimeout(dirtyT);dirtyT=setTimeout(()=>{if(cur){scripts[cur]=cm.getValue();persist()}},600)});
-function refresh(){if(!(cur in scripts))cur=Object.keys(scripts)[0]||'';$('sel').innerHTML=Object.keys(scripts).map(n=>`<option>${esc(n)}</option>`).join('');$('sel').value=cur;cm.setValue(scripts[cur]||'');cm.clearHistory();persist()}
+let dirtyT;const setDirty=d=>{$('save').textContent=d?'💾•':'💾';$('save').title=d?'Unsaved changes (autosaves in a moment)':'Saved'};
+cm.on('change',(c,ch)=>{if(ch.origin==='setValue')return;setDirty(true);clearTimeout(dirtyT);dirtyT=setTimeout(()=>{if(cur){scripts[cur]=cm.getValue();persist();setDirty(false)}},600)});
+function refresh(){if(!(cur in scripts))cur=Object.keys(scripts)[0]||'';$('sel').innerHTML=Object.keys(scripts).map(n=>`<option>${esc(n)}</option>`).join('');$('sel').value=cur;cm.setValue(scripts[cur]||'');cm.clearHistory();persist();if(typeof setDirty==='function')setDirty(false)}
 $('sel').onchange=()=>{scripts[cur]=cm.getValue();cur=$('sel').value;refresh()};
-$('save').onclick=()=>{if(!cur)return $('new').click();scripts[cur]=cm.getValue();persist();log('Saved '+cur,'sys')};
+$('save').onclick=()=>{if(!cur)return $('new').click();clearTimeout(dirtyT);scripts[cur]=cm.getValue();persist();setDirty(false);log('Saved '+cur,'sys')};
 function newScript(name,code){let n=name,i=2;while(n in scripts)n=name+' '+i++;if(cur)scripts[cur]=cm.getValue();scripts[n]=code;cur=n;refresh();return n}
 $('new').onclick=()=>{const n=prompt('Script name?');if(n)newScript(n,'print("hi")\n')};
 $('snipbtn').onclick=()=>{showView('v-files');setTimeout(()=>$('snip-list').scrollIntoView({behavior:'smooth'}),50)};
@@ -53,7 +54,7 @@ cm.on('focus',()=>setTimeout(placeKeybar,300));cm.on('blur',()=>setTimeout(place
 
 /* ---------- output ---------- */
 let outEl=null;
-function log(t,c){const o=outEl||$('out');const s=document.createElement('span');if(c)s.className=c;if(c==='err')linkify(s,t+'\n');else s.textContent=t+'\n';o.appendChild(s);if(!outEl)s.scrollIntoView({block:'nearest'})}
+function log(t,c){const o=outEl||$('out');const s=document.createElement('span');if(c)s.className=c;if(c==='err')linkify(s,t+'\n');else s.textContent=t+'\n';o.appendChild(s);o.scrollTop=o.scrollHeight}
 window.kpShowImg=b64=>{const i=new Image();i.src='data:image/png;base64,'+b64;(outEl||$('out')).appendChild(i)};
 $('clr').onclick=()=>$('out').textContent='';
 
@@ -77,7 +78,16 @@ async function startWorker(){newReady();$('pystat').textContent='Loading Python�
  if(self.crossOriginIsolated&&typeof SharedArrayBuffer!=='undefined'){SAB=new SharedArrayBuffer(12+65536);INTR=new Uint8Array(SAB,0,1);CTL=new Int32Array(SAB,4,2);DAT=new Uint8Array(SAB,12)}
  W=new Worker('worker.js');W.onmessage=onW;W.onerror=e=>log('Worker error: '+(e.message||e),'err');
  W.postMessage({cmd:'init',pkgs:J('kp_pkgs',[]),native:['numpy','pandas','matplotlib','scipy','sympy','scikit-learn','pillow'],sab:SAB,setup:setupTxt,wsetup:wsetupTxt,tools:TOOLS})}
+/* batched plain stdout: one DOM write per frame, pane keeps the last MAXL lines */
+let obuf=[],oraf=0;const MAXL=5000;
+function bufOut(s){obuf.push(s);if(!oraf)oraf=requestAnimationFrame(flushOut)}
+function flushOut(){if(oraf){cancelAnimationFrame(oraf);oraf=0}if(!obuf.length)return;const o=outEl||$('out');const t=obuf.join('\n')+'\n';obuf=[];
+ const s=document.createElement('span');s.textContent=t;o.appendChild(s);trimOut(o);o.scrollTop=o.scrollHeight}
+function trimOut(o){let n=0;for(const c of o.childNodes)if(!c.classList?.contains('trimnote'))n+=(c.textContent.match(/\n/g)||[]).length;
+ while(n>MAXL&&o.firstChild){const c=o.firstChild;const k=(c.textContent.match(/\n/g)||[]).length;if(n-k<MAXL&&c.nodeType===1&&c.tagName==='SPAN'){const ls=c.textContent.split('\n');c.textContent=ls.slice(n-MAXL).join('\n');n=MAXL;break}n-=k;c.remove()}
+ if(n>=MAXL){o.querySelector('.trimnote')?.remove();const s=document.createElement('span');s.className='sys trimnote';s.textContent='(older output trimmed to last '+MAXL+' lines)\n';o.prepend(s)}}
 function onW(e){const m=e.data;
+ if(m.t==='out'&&!m.c){bufOut(m.s);return}flushOut();
  if(m.t==='out')log(m.s,m.c);else if(m.t==='img')kpShowImg(m.b);else if(m.t==='turtle')kpT(...m.a);
  else if(m.t==='input')askInput(m);
  else if(m.t==='ready'){pyVer=m.v;$('pystat').textContent='Python '+m.v+(m.sab?'':' ·');$('pystat').title=m.sab?'Stop interrupts in place':'Stop restarts Python';$('pystat').classList.add('ok');

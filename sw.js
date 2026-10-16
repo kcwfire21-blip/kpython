@@ -1,5 +1,5 @@
 // KPython v4 service worker: offline cache + cross-origin isolation headers (for SharedArrayBuffer) + input() bridge fallback.
-const C='kpython-v4';
+const C='kpython-v4.1';
 const SHELL=['./','./index.html','./app.css','./app.js','./app4.js','./games.js','./github.js','./snippets.js','./worker.js','./kp_setup.py','./kp_worker.py','./manifest.json','./apple-touch-icon.png','./icon-192.png','./icon-512.png',
  ...['r2_eight_lint','r2_dyno_tests','r2_forlor_http','r2_drop_diff','r2_getback_sql','r2_bot3_profile','r2_bot2help_data','r2_bot2_outline','r2_bot_projects'].map(n=>'./tools/'+n+'.py')];
 const CM='https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/',PY='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
