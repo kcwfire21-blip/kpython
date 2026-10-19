@@ -17,7 +17,7 @@ except NameError:
 
 # (label, purpose, how to use, example, keywords)
 _RAW = [
- ("🧹 Lint", "Check the open script for syntax errors, unused imports/variables, undefined names, long lines and missing docstrings. Never runs your code.",
+ ("🧹 Lint", "Check the open script with two checkers: Eight's (syntax errors, unused imports/variables, undefined names, long lines, missing docstrings) and bot2's quick lint (shadowed builtins, mutable defaults, bare except, == None, unreachable code). Never runs your code.",
   "Open a script in the editor, go to Dev, tap 🧹 Lint. Read the line-numbered report.", "A file with 'import os' never used shows: unused import 'os' on line 1.", "lint check errors syntax unused undefined style"),
  ("✅ Run tests", "Run unittest TestCases and doctests in the open script and show pass/fail counts, tracebacks and timing.",
   "Tap ✅ Run tests and confirm (it executes the script).", "A script with class T(unittest.TestCase) shows 'Ran 3 tests: 3 passed'.", "test unittest doctest pass fail"),
@@ -99,6 +99,12 @@ _RAW = [
   "Tap 🥋 Katas, pick a challenge, write your solution.", "'reverse': return s reversed (hint: s[::-1]).", "katas challenges practice exercises learn"),
  ("📦 Packages", "List installed packages, look up PyPI names, warn on typos, and do confirmed, pinned micropip installs.",
   "Tap 📦 Packages and follow the menu.", "Look up 'requests' version and whether it has a pure-Python wheel.", "packages pypi micropip install"),
+ ("🧹 Quick lint (menu)", "bot2's quick checker on any file in ~ or pasted code, as file:line codes (W001 unused import … W007 unreachable code).",
+  "Tap 🧹 Quick lint (menu), pick 1 (file), 2 (paste, END to finish) or 3 (demo).", "def f(a=[]): reports W004 mutable default argument.", "quick lint unused shadow builtin mutable default bare except"),
+ ("🔁 Find & replace in files", "Find or replace text (plain or regex, case, whole word) in files under ~, with a diff per file and y/N/a/q for each. 'a' asks once more before writing the rest. Saved scripts are skipped (use ✏️ Replace in saved scripts).",
+  "Tap 🔁 Find & replace in files, choose Find or Find and replace, answer the questions.", "Rename greet( to welcome( across ~/proj.", "find replace files folder regex diff"),
+ ("📎 Snippet library", "Your own reusable snippets with tags, search and {{var}} fill-in, saved in ~/kp_snippets.json; JSON export/import; refuses real-looking secrets. Insert at the editor cursor asks you first in the app.",
+  "Tap 📎 Snippet library and pick from the menu (save, list, search, insert, export, import).", "Save 'req' with url = '{{base}}/x', insert it with base=https://api.example.com.", "snippet library insert template tags reuse"),
 ]
 
 

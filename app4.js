@@ -81,12 +81,15 @@ document.querySelectorAll('.dq').forEach(b=>b.onclick=()=>{$('d-q').value=b.text
 /* ---- Dev tab ---- */
 const devOut=()=>$('dv-out');
 // v9: Cancel on an input() prompt ends any tool cleanly ("Cancelled."), and a tool can never leave a tracer (debugger) running.
-function devWrap(code){return 'import sys as _kp_sys, builtins as _kp_bi\n_kp_bi.kp_open_script = ('+JSON.stringify(cur||'')+', '+JSON.stringify(cm.getValue().slice(0,500000))+') if '+JSON.stringify(cur||'')+' else None\nfrom __main__ import _kp_nav_input as _kp_nav\n_kp_nav.inner, _kp_nav.n = _kp_bi.input, 0\n_kp_bi.input = _kp_nav\ntry:\n'+code.split('\n').map(l=>'    '+l).join('\n')+'\nexcept (KeyboardInterrupt, EOFError) as _kp_e:\n    if isinstance(_kp_e, KeyboardInterrupt) and not isinstance(_kp_e, KPBack) and "input cancelled" not in str(_kp_e): raise\n    print("\\n⏹ Cancelled.")\nfinally:\n    _kp_sys.settrace(None)\n    _kp_bi.input = _kp_nav.inner\n'}
+function devWrap(code){return 'import sys as _kp_sys, builtins as _kp_bi\n_kp_bi.kp_open_script = ('+JSON.stringify(cur||'')+', '+JSON.stringify(cm.getValue().slice(0,500000))+') if '+JSON.stringify(cur||'')+' else None\nfrom __main__ import _kp_nav_input as _kp_nav\n_kp_nav.inner, _kp_nav.n = _kp_bi.input, 0\n_kp_bi.input = _kp_nav\ntry:\n    while True:\n        try:\n'+code.split('\n').map(l=>'            '+l).join('\n')+'\n            break\n        except KPBack:\n            print("\\n↩ Back to the start of the tool (Cancel again to close it).")\nexcept (KeyboardInterrupt, EOFError) as _kp_e:\n    if isinstance(_kp_e, KeyboardInterrupt) and not isinstance(_kp_e, KPBack) and "input cancelled" not in str(_kp_e): raise\n    print("\\n⏹ Cancelled.")\nfinally:\n    _kp_sys.settrace(None)\n    _kp_bi.input = _kp_nav.inner\n'}
 async function dev(label,code){kpJobNext='The Dev tool "'+label+'"';devOut().textContent='';log('— '+label+' —','sys');const t=devOut();const r=await job({cmd:'run',code:'from __main__ import _kp_lint, _kp_tests, _kp_outline, _kp_diff, _kp_profile, _kp_debug, _kp_metrics, _kp_types, _kp_snapshot, _kp_cover, _kp_memory, _kp_secrets, _kp_imports\n'+devWrap(code),files:allFiles(),fname:'__kp_run__.py'},{target:t});const s=document.createElement('span');s.className='sys';s.textContent=(r.ok?'— done —':(/Stopped|KeyboardInterrupt/.test(r.err||'')?'— stopped —':'— error —'))+'\n';t.appendChild(s);return r}
 const J2=s=>JSON.stringify(s);
 const curSrc=()=>{scripts[cur]=cm.getValue();persist();return cm.getValue()};
 const DEV={
- lint:()=>dev('Lint '+cur,`print("Lint: ${cur.replace(/[\\"]/g,'')}  (Eight's checker, never runs your code)")\n_kp_lint(${J2(curSrc())})`),
+ lint:()=>dev('Lint '+cur,`print("Lint: ${cur.replace(/[\\"]/g,'')}  (never runs your code)")\nprint("— Eight's checker —")\n_kp_lint(${J2(curSrc())})\nprint("\\n— bot2's quick lint (unused names, shadowed builtins, mutable defaults…) —")\nimport r9_bot2_lint as _q\ntry:\n    _r = _q.lint(${J2(curSrc())}, ${J2(cur.replace(/[^\w.-]/g,'_')+'.py')})\n    print("\\n".join(_r) if _r else "No problems found.")\nexcept SyntaxError as _e:\n    print(f"line {_e.lineno}: syntax error: {_e.msg}")`),
+ quicklint:()=>dev('Quick lint','import r9_bot2_lint as m; m.main()'),
+ findrep:()=>dev('Find & replace','import r9_dyno_findreplace as m; m.run_tool(m.main)'),
+ snippets:()=>dev('Snippets','import r9_forlor_snippets as m; m.run_tool(m.main)'),
  tests:()=>!confirm(`Run tests? This executes "${cur}".`)?(devOut().textContent='Cancelled.'):dev('Tests '+cur,`_kp_tests(${J2(curSrc())}, ${J2(cur)})`),
  outline:()=>dev('Outline '+cur,`_kp_outline(${J2(curSrc())})`),
  rename:async()=>{const o=prompt('Rename which name? (token-safe: skips strings and comments)');if(!o)return;const n=prompt(`Rename "${o}" to:`);if(!n)return;
@@ -193,6 +196,7 @@ function renderSites(){const l=getSites();$('st-list').innerHTML=l.map((s,i)=>`<
 async function applySites(msg){sitesBusy=true;$('st-add').disabled=true;try{await applySites0(msg)}finally{sitesBusy=false;$('st-add').disabled=false}}
 async function applySites0(msg){renderSites();$('st-msg').textContent=msg+'. Restarting Python to apply…';toast2('Restarting Python to apply');
  try{await syncSites()}catch(e){$('st-msg').textContent=msg+'. (Service worker not ready; reload the app to apply.)';return}
+ if(!wStarted){$('st-msg').textContent=msg+'. Applied (Python will use it when it starts).';return} // r9 Lite start: Python not loaded yet
  if(running){W.terminate();Object.values(pend).forEach(p=>p({ok:false,err:'⏹ Restarted to apply Allowed sites.'}));pend={};inputMsg=null}else W.terminate();
  startWorker();await pyReady;$('st-msg').textContent=msg+'. Applied.'}
 let sitesBusy=false;
@@ -227,11 +231,14 @@ $('bk-undo').onclick=()=>{let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]'
  if(LS.getItem('kp_toured')||running)return;LS.setItem('kp_toured','1');
  if(confirm('Welcome to KPython! Take the 1-minute getting-started tour?\n\n(You can open it any time from Dev › 🧭 Getting-started tour.)')){showView('v-dev');DEV.tour()}}catch(e){console.error(e)}})();
 // v10: cold-start progress bar for the Python download (the SW reports bytes; content-length is the compressed size, so it's an estimate)
-(()=>{if(!('serviceWorker'in navigator))return;const F={};let bar=null;
+(()=>{if(!('serviceWorker'in navigator))return;const F={};let bar=null,lb=null;
  navigator.serviceWorker.addEventListener('message',e=>{const p=e.data&&e.data.kpProgress;if(!p)return;F[p.f]=p;
-  if(!bar){bar=document.createElement('progress');bar.id='pyprog';bar.max=1;bar.setAttribute('aria-label','Downloading Python');$('pystat').after(bar)}
+  if(!bar){bar=document.createElement('progress');bar.id='pyprog';bar.max=1;bar.setAttribute('aria-label','Downloading Python');$('top-pills').after(bar);
+   // v11 (bot r9): Python usually downloads while the passcode screen is up, so the lock screen shows the progress too
+   lb=document.createElement('div');lb.id='lockprog';const lp=document.createElement('progress');lp.max=1;lp.setAttribute('aria-label','Downloading Python');const lt=document.createElement('div');lt.className='hint';lb.append(lp,lt);$('lock').appendChild(lb)}
   const all=Object.values(F),got=all.reduce((a,x)=>a+x.got,0),tot=all.reduce((a,x)=>a+Math.max(x.total,x.got),0);bar.value=tot?got/tot:0;
-  bar.title=`Downloading Python: ${(got/1e6).toFixed(1)} MB`;if(all.every(x=>x.done)){setTimeout(()=>{bar&&bar.remove();bar=null},800)}})})();
+  bar.title=`Downloading Python: ${(got/1e6).toFixed(1)} MB`;lb.firstChild.value=bar.value;lb.lastChild.textContent=`Downloading Python… ${(got/1e6).toFixed(1)} MB (first time only)`;
+  if(all.every(x=>x.done)){lb.lastChild.textContent='Python downloaded ✓';setTimeout(()=>{bar&&bar.remove();bar=null;lb&&lb.remove();lb=null},800)}})})();
 // v10: games + GitHub panel load once the page is idle, OR immediately on the first tap inside them (the tap is replayed, so there is no dead zone)
 (()=>{let P=null;const stamp=()=>{const t=document.getElementById('tpl-games');if(!t)return;t.replaceWith(t.content.cloneNode(true));
   [['sn-c','Snake game board'],['g2-c','2048 game board']].forEach(([i,n])=>{const e=document.getElementById(i);if(e){e.setAttribute('role','img');e.setAttribute('aria-label',n)}});
@@ -242,10 +249,38 @@ $('bk-undo').onclick=()=>{let s=[];try{s=JSON.parse(LS.getItem('kp_snaps')||'[]'
   e.preventDefault();e.stopImmediatePropagation();const t=e.target;load().then(()=>{t.dataset.kpReplay=1;t.click();delete t.dataset.kpReplay})},true);
  const go=()=>window.requestIdleCallback?requestIdleCallback(load,{timeout:2000}):setTimeout(load,300);
  if(document.readyState==='complete')go();else window.addEventListener('load',go)})();
-// v10: the Help guide in the app (static guide.html, generated from Eight's guide; no scripts inside)
+// v10/v11: the Help guide in the app. guide.html is static; it is used only if the SW verified it against this version's
+// manifest, and it is rebuilt from an allowlist of tags (no attributes except https links), so a bad copy can't draw UI.
 (()=>{const b=document.createElement('button');b.id='guide-btn';b.textContent='📖';b.title='How to use KPython';b.setAttribute('aria-label','How to use KPython (guide)');
  const lk=$('pal-btn')||$('lockbtn');lk.parentNode.insertBefore(b,lk);
- b.onclick=async()=>{let g=$('guide');if(!g){g=document.createElement('div');g.id='guide';g.setAttribute('role','dialog');g.setAttribute('aria-label','How to use KPython');g.hidden=true;
-  const x=document.createElement('button');x.className='pri';x.textContent='✕ Close guide';x.onclick=()=>{g.hidden=true};const body=document.createElement('div');
-  try{body.innerHTML=await (await fetch('guide.html')).text()}catch(e){body.textContent='Guide not available offline yet.'}
-  g.append(x,body);document.body.appendChild(g);window.addEventListener('kp-lock',()=>{g.hidden=true})}g.hidden=false;g.scrollTop=0;g.querySelector('button').focus()}})();
+ const OK=new Set(['H2','H3','P','UL','OL','LI','STRONG','EM','CODE','BR']);
+ function clean(src,dst){for(const n of src.childNodes){if(n.nodeType===3){dst.appendChild(document.createTextNode(n.textContent));continue}if(n.nodeType!==1)continue;
+  if(n.tagName==='A'){const h=n.getAttribute('href')||'';if(/^https:\/\/[^\s"'<>]+$/.test(h)){const a=document.createElement('a');a.href=h;a.target='_blank';a.rel='noopener noreferrer';clean(n,a);dst.appendChild(a)}else clean(n,dst);continue}
+  if(OK.has(n.tagName)){const e=document.createElement(n.tagName.toLowerCase());clean(n,e);dst.appendChild(e)}else clean(n,dst)}}
+ const close=()=>{const g=$('guide');if(g&&!g.hidden){g.hidden=true;b.focus()}};
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('guide')&&!$('guide').hidden){e.preventDefault();close()}});
+ b.onclick=async()=>{let g=$('guide');if(!g){g=document.createElement('div');g.id='guide';g.setAttribute('role','dialog');g.setAttribute('aria-modal','true');g.setAttribute('aria-label','How to use KPython');g.hidden=true;
+  const bar=document.createElement('div');bar.id='guide-bar';const x=document.createElement('button');x.className='pri';x.textContent='✕ Close guide';x.onclick=close;
+  const sel=document.createElement('select');sel.id='guide-toc';sel.setAttribute('aria-label','Jump to a section');bar.append(x,sel);const body=document.createElement('div');body.id='guide-body';
+  try{const r=await fetch('guide.html');if(!r.ok||r.headers.get('X-KP-Verified')!=='1')throw new Error('not verified');
+   clean(new DOMParser().parseFromString(await r.text(),'text/html').body,body)}catch(e){body.textContent='The guide is not available right now (offline, or this copy did not pass the integrity check). Reload the app and try again.'}
+  const hs=[...body.querySelectorAll('h3')];const o0=document.createElement('option');o0.textContent='Jump to…';o0.value='';sel.appendChild(o0);
+  hs.forEach((h,i)=>{h.id='g-s'+i;h.tabIndex=-1;const o=document.createElement('option');o.value=h.id;o.textContent=h.textContent;sel.appendChild(o)});
+  sel.onchange=()=>{const h=sel.value&&document.getElementById(sel.value);if(h){h.scrollIntoView({block:'start'});h.focus({preventScroll:true})}sel.value=''};
+  g.append(bar,body);document.body.appendChild(g);window.addEventListener('kp-lock',()=>{g.hidden=true})}
+  g.hidden=false;g.scrollTop=0;g.querySelector('button').focus()}})();
+// v11 (bot r9): files in ~ (GitHub imports, projects, CSVs…) are listed on the Files tab, with Open-as-script and Save
+(()=>{const L=$('fh-list');if(!L)return;const fmt=n=>n>1e6?(n/1e6).toFixed(1)+' MB':n>1e3?Math.round(n/1e3)+' KB':n+' B';
+ async function show(){L.textContent='Loading…';let a;try{a=JSON.parse(await pycall('_kp_home_list'))}catch(e){L.textContent='Python is busy or not ready. Try again.';return}
+  L.textContent='';if(!a.length){L.textContent='No files yet.';return}
+  for(const f of a.slice(0,500)){const row=document.createElement('div');row.className='item';const s=document.createElement('span');s.textContent='~/'+f.p+'  ('+fmt(f.n)+')';
+   const bs=document.createElement('span');if(f.t){const o=document.createElement('button');o.textContent='Open as script';o.onclick=()=>openF(f.p);bs.append(o,' ')}
+   const d=document.createElement('button');d.textContent='⬇️';d.title='Save to the phone';d.setAttribute('aria-label','Save '+f.p+' to the phone');d.onclick=()=>saveF(f.p);bs.append(d);row.append(s,bs);L.appendChild(row)}
+  if(a.length>500)L.append('… and '+(a.length-500)+' more')}
+ async function get(p){const r=JSON.parse(await pycall('_kp_home_read',p));if(r.err)throw new Error(r.err);return r}
+ async function openF(p){try{const r=await get(p);if(r.t===undefined)return alert('That file is not text.');const nm=p.split('/').pop().replace(/\.py$/,'');
+  if(!confirm('Open ~/'+p+' as a new saved script "'+nm+'"? (This makes a copy; the file in ~ is unchanged.)'))return;newScript(nm,r.t);showView('v-code')}catch(e){alert('Could not open: '+e.message)}}
+ async function saveF(p){try{const r=await get(p);const blob=r.t!==undefined?new Blob([r.t],{type:'text/plain'}):new Blob([Uint8Array.from(atob(r.b),c=>c.charCodeAt(0))]);
+  const file=new File([blob],p.split('/').pop());if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;document.body.appendChild(a);a.click();a.remove()}catch(e){alert('Could not save: '+e.message)}}
+ $('fh-ref').onclick=show;window.kpShowHomeFiles=show})();

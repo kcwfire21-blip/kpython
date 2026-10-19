@@ -284,7 +284,15 @@ async def download(o, r, ref, f, use_raw):
         body = base64.b64decode(d.get("content", ""))
     if len(body) > MAX_FILE:
         raise GHError(f"{p} is larger than expected")
+    if re.fullmatch(r"[0-9a-f]{40}", sha or "") and git_blob_sha(body) != sha:   # v11: content must match the tree
+        raise GHError(f"{p}: downloaded content doesn't match the repository (git blob hash mismatch); nothing more written")
     return body
+
+
+def git_blob_sha(data):
+    """git's blob id: sha1(b"blob <len>\\0" + data)."""
+    import hashlib
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
 def atomic_write(full, data):
@@ -292,9 +300,25 @@ def atomic_write(full, data):
     if os.path.islink(full):
         raise ValueError("refused: target is a symlink")
     tmp = full + ".kptmp"
-    with open(tmp, "wb") as fh:
+    if os.path.lexists(tmp):          # v11 (Get back L7): never follow something planted at the temp name
+        if os.path.isdir(tmp) and not os.path.islink(tmp):
+            raise ValueError("refused: temp name is a folder")
+        os.remove(tmp)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o644)
+    with os.fdopen(fd, "wb") as fh:
         fh.write(data)
     os.replace(tmp, full)
+
+
+def reserved_name(name):
+    """v11 (Drop #3): a folder in ~ named like a stdlib module, a KPython tool or kp_* could shadow it on import."""
+    import builtins as _b
+    n = (name or "").strip().lower().replace("-", "_")
+    tools = set()
+    try: tools = set(getattr(_b, "kp_tool_names", lambda: ())())
+    except Exception: pass
+    std = set(getattr(sys, "stdlib_module_names", ()))
+    return n in std or n in tools or n.startswith(("kp_", "_kp")) or bool(re.match(r"r\d+_", n))
 
 
 # ---------- main flow ----------
@@ -305,7 +329,12 @@ async def import_repo(spec, dest=None, ask=input, out=print):
         ref = info.get("default_branch") or ""
         if not valid_ref(ref):
             raise GHError("Couldn't read the default branch.")
+    if not dest and reserved_name(r):
+        dest = "gh_" + r
+        out(f"  (saving into ~/{dest}: a folder named {r!r} could shadow a Python module)")
     dest = dest or r
+    if reserved_name(dest):
+        raise GHError(f"Folder name {dest!r} is reserved (Python module or KPython tool name); pick another, e.g. gh_{dest}")
     if not valid_repo(dest) or dest.lower() == ".history":
         raise GHError(f"Invalid destination folder {dest!r}")
     root = safe_join(dest, "x")[:-2]
@@ -326,9 +355,9 @@ async def import_repo(spec, dest=None, ask=input, out=print):
         out(f"  Downloads via the GitHub API: {calls} requests" + (f" (you have {remaining} left this hour)." if remaining else ".")
             + "\n  Tip: add https://raw.githubusercontent.com in Tools > Allowed sites to avoid the quota.")
         import builtins as _b
-        if IN_PYODIDE and FETCH is None and hasattr(_b, "kp_request_site") and ask("  Ask the app to add raw.githubusercontent.com to Allowed sites? It applies on your next import. (y/N): ").strip().lower() in ("y", "yes"):
+        if IN_PYODIDE and FETCH is None and hasattr(_b, "kp_request_site") and ask("  Ask the app to add raw.githubusercontent.com to Allowed sites? (applies after Python restarts at the end of this run) (y/N): ").strip().lower() in ("y", "yes"):
             if await _b.kp_request_site(RAW, "GitHub import: download files without using the API quota"):
-                out("  Added. Python restarts after this run; import again to use it (this run keeps using the API).")
+                out("  Added. Python restarts when this run ends; import again after that to use it (this run keeps using the API).")
             else:
                 out("  Not added.")
         if remaining and remaining.isdigit() and int(remaining) < calls:
@@ -345,7 +374,7 @@ async def import_repo(spec, dest=None, ask=input, out=print):
             out("Cancelled. Nothing written."); return 0
         overwrite = a == "o"
     todo = files if overwrite else new
-    written, skipped_bin = 0, 0
+    written, skipped_bin, names = 0, 0, []
     for i, f in enumerate(todo, 1):
         body = await download(o, r, ref, f, use_raw)
         if is_binary_data(body):
@@ -354,10 +383,13 @@ async def import_repo(spec, dest=None, ask=input, out=print):
         if os.path.exists(full) and not overwrite:
             continue
         atomic_write(full, body)
-        written += 1
+        written += 1; names.append(f[0])
         if i % 25 == 0:
             out(f"  … {i}/{len(todo)}")
     out(f"Done: wrote {written} file(s) to ~/{dest}" + (f", skipped {skipped_bin} binary" if skipped_bin else "") + ".")
+    for n in names[:60]: out(f"  ~/{dest}/{n}")
+    if len(names) > 60: out(f"  … and {len(names) - 60} more")
+    if names: out("  They're in Files › 📂 Files in ~ (the .py ones can also be opened as scripts with Import).")
     return written
 
 
@@ -452,6 +484,10 @@ async def _aself_test():
             {"path": "bin.dat", "type": "blob", "mode": "100644", "sha": S(10), "size": 4},
         ]}
         blobs = {"README.md": b"hello world\n", "src/app.py": b"print('hi')\n", "bin.dat": b"\x00\x01\x02\x03"}
+        for _e in tree["tree"]:
+            if _e["path"] in blobs: _e["sha"] = git_blob_sha(blobs[_e["path"]])
+        t(git_blob_sha(b"hello world\n") == "3b18e512dba79e4c8300dd08aeb37f8e728b8dad", "git blob sha")
+        t(reserved_name("json") and reserved_name("kp_common") and reserved_name("r6_drop_merge") and not reserved_name("Spoon-Knife"), "reserved names")
         calls = []
 
         async def mock(url):

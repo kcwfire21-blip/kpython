@@ -1,4 +1,6 @@
-<!-- generated from contrib/r8_eight_guide.md (Eight); static content, no scripts -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self' data:">
+<!-- KPython v11 guide (Eight's r9 draft, updated by Kai to match v11). Static content, no scripts. The app shows it only if the
+     service worker verified it, and rebuilds it from a short list of tags. -->
 <h2>How to use KPython on iPhone</h2>
 <p>KPython runs Python right on your phone (Pyodide). Your code isn't uploaded anywhere.</p>
 <h3>1. Install</h3>
@@ -8,11 +10,12 @@
 <li>The first time you open it, it asks you to <strong>create a passcode (4+ characters)</strong>. Tap <strong>Unlock</strong>. Tap 🔒 to lock it again.</li>
 <li>The passcode only hides the screen. It does <strong>not</strong> encrypt anything.</li>
 </ul>
-<p><strong>Offline:</strong> after one load with internet, the app saves its own files plus Python, so it works without a signal. Packages you've loaded are saved for offline use too. When an update is ready, the app saves your editor and shows a bar to <strong>tap to reload</strong>. It never reloads by itself.</p>
+<p><strong>Offline:</strong> after one load with internet, the app saves its own files plus Python, so it works without a signal. The badge in the header changes from <strong>⏳ Caching…</strong> to <strong>✈️ Offline ready</strong> when that's done. The first time Python downloads, a progress bar shows under the Python status and on the passcode screen. Packages you've loaded are saved for offline use too. When an update is ready, the app saves your editor and shows a bar to <strong>tap to reload</strong>. It never reloads by itself.</p>
+<p><strong>Lite start</strong> (off unless you turn it on): <strong>📁 Files ▸ ⚙️ Settings ▸ Lite start</strong> waits to download Python (about 6 MB) until you first need it. The status then reads <strong>Python: starts on first Run</strong>; your first <strong>▶ Run</strong> shows <strong>Starting Python…</strong> and runs as soon as it's ready.</p>
 <h3>2. Your first script</h3>
 <ul>
 <li>Go to the <strong>⌨️ Code</strong> tab and wait until the button changes from "Loading Python…" to <strong>▶ Run</strong>.</li>
-<li>Tap <strong>＋</strong> for a new script, or <strong>📚</strong> to start from a snippet.</li>
+<li>Tap <strong>＋</strong> for a new script, or <strong>📚</strong> to start from a snippet (see <em>Snippet library</em> below).</li>
 <li>Type <code>print("Hello, Keivon")</code> and tap <strong>▶ Run</strong>. The output shows up below.</li>
 <li><code>input()</code> works: the app asks you for the answer.</li>
 <li>Stuck in a loop? Tap <strong>⏹ Stop</strong>.</li>
@@ -20,22 +23,29 @@
 <li>The <strong>&gt;_ REPL</strong> tab is a Python console for quick one-line tests. Try <code>help(str.split)</code>.</li>
 <li>To add packages, type a name and tap <strong>Install</strong>, or tap <strong>numpy</strong>, <strong>pandas</strong> or <strong>matplotlib</strong>.</li>
 </ul>
+<p><strong>Find and replace:</strong> in the Code tab, tap <strong>🔍</strong> (Find/replace) to open the find bar. Type in <em>Find</em>. <strong>▼</strong> and <strong>▲</strong> jump to the next or previous match (Enter also goes to the next one), and the bar shows how many matches there are. Type in <em>Replace with</em>, then tap <strong>Replace</strong> to change the selected match or <strong>All</strong> to change every match. Tick <strong>Match case</strong> to match capital letters exactly. <strong>✕</strong> closes the bar. <strong>All</strong> doesn't ask first, so use the editor's undo (↶ on the keys row) if it changed too much.</p>
+<p><strong>Snippet library:</strong> <strong>📚</strong> jumps to <strong>📚 Snippets</strong> on the Files tab. Pick a category in the list (or <strong>All</strong>). Each snippet has <strong>Open</strong> (copies it into a new script) and <strong>▶ Run</strong> (copies it and runs it straight away). Team snippets show which bot made them. For bigger starter templates, use Dev ▸ <strong>🧩 Templates</strong>.</p>
 <h3>3. Files</h3>
 <p>On the <strong>📁 Files</strong> tab you'll see <strong>My Scripts</strong>, with these buttons:</p>
 <ul>
 <li><strong>＋ New</strong> makes a new script.</li>
 <li><strong>📥 Import .py</strong> brings in a script from the iPhone Files app.</li>
+<li>Each script has <strong>Open</strong>, <strong>⧉</strong> (duplicate), <strong>✎</strong> (rename) and <strong>🗑</strong> (delete, which asks first; bring it back with <strong>↶ Undo</strong>).</li>
 <li><strong>📤 Export this file</strong> (in the Code tab) exports one script. It's <strong>not</strong> a backup.</li>
+<li><strong>📂 Files in ~</strong>: tap <strong>↻ Show</strong> to list the files your tools saved (GitHub imports, projects, CSVs, databases). Text files have <strong>Open as script</strong> (makes a copy as a saved script); <strong>⬇️</strong> saves any file to the phone.</li>
+<li><strong>⚙️ Settings</strong> has the <strong>Lite start</strong> switch.</li>
 </ul>
 <h3>4. Dev tools</h3>
 <p>The <strong>🛠 Dev</strong> tab works on the script that's open. Some useful ones:</p>
 <ul>
-<li><strong>🧹 Lint</strong> finds mistakes <strong>without running</strong> your code.</li>
+<li><strong>🧹 Lint</strong> checks the open script <strong>without running it</strong>, with two checkers. Eight's reports syntax errors, unused imports and variables, names that aren't defined, lines that are too long, and missing docstrings. bot2's quick lint adds shadowed builtins, mutable default arguments, bare <code>except:</code>, <code>== None</code> and unreachable code. Each finding has its line number. Fix them in the editor (🔍 helps you jump to a name), then tap Lint again. <strong>🧹 Quick lint (menu)</strong> checks any file in ~ or pasted code.</li>
+<li><strong>🔁 Find &amp; replace in files</strong> searches files under ~ (plain text or regex, match case, whole words). For each file it shows a diff and asks <strong>y</strong> (write), <strong>N</strong> (skip), <strong>a</strong> (all remaining, which asks once more) or <strong>q</strong> (stop). It skips your saved scripts: change those with <strong>✏️ Replace in saved scripts</strong>.</li>
+<li><strong>📎 Snippet library</strong> keeps your own snippets with tags and <code>{{name}}</code> blanks to fill in. <strong>Insert</strong> asks the app to put it at the editor cursor: the app shows the whole text and inserts it only if you tap <strong>Insert</strong>.</li>
 <li><strong>✨ Format</strong> tidies your code. <strong>📝 Docstrings</strong> adds descriptions to your functions. Both show you the changes first and ask before applying them. Undo with ↶.</li>
 <li><strong>✅ Run tests</strong>, <strong>⏱ Profile</strong>, <strong>🐞 Debug</strong>, <strong>🧪 Coverage</strong> and <strong>🧠 Memory</strong> <strong>run your code</strong>, so they ask first.</li>
 <li><strong>🕘 Save version</strong> saves a copy of your script. <strong>📜 History</strong> lets you compare versions or go back to an old one.</li>
 <li><strong>🔑 Secret scan</strong> finds passwords or tokens left in your scripts.</li>
-<li><strong>🧰 Tools ▸ 🛠 More</strong> has team scripts (Dev tools, Terminal, Job tracker, GitHub browser, Loan calc, Rent check). Tapping a button <strong>runs that script right away</strong> in the Code tab.</li>
+<li><strong>🧰 Tools ▸ 🛠 More</strong> has team scripts (Dev tools, Terminal, Job tracker, GitHub browser, Loan calc, Rent check). Tapping a button asks <em>Open … as a new script and run it now?</em> and then runs it in the Code tab.</li>
 </ul>
 <p><strong>Safety tip:</strong> in <strong>⌨️ Terminal</strong>, <code>python &lt;file&gt;</code> and <code>pip install</code> <strong>ask you first</strong> (type y). Only run files you wrote or trust. Check package names carefully, or use Dev ▸ <strong>📦 Packages</strong>, which confirms first.</p>
 <h3>5. GitHub push safety</h3>
@@ -52,23 +62,25 @@
 <h3>6. Allowed sites</h3>
 <p>Your scripts can only reach the internet sites on this list, which includes the tester in Dev ▸ <strong>🌐 HTTP</strong>. Open <strong>🧰 Tools ▸ 🌐 Allowed sites</strong>.</p>
 <ul>
-<li>Type an <code>https://</code> address with no path, such as <code>https://api.example.com</code>, and tap <strong>Add</strong>.</li>
-<li>Only this screen can change the list. Scripts can't.</li>
-<li><strong>Reset to defaults…</strong> clears your additions.</li>
+<li>Type an <code>https://</code> address with no path, such as <code>https://api.example.com</code>, and tap <strong>Add</strong>. Then type <strong>yes</strong> to confirm. A raw IP address also asks you to type <strong>IP</strong>.</li>
+<li>A running script can <strong>ask</strong> to add one site (once per run). You get a popup with the address and its reason, and nothing is added unless you tap OK. Python restarts after the run so the change applies. Scripts can't add sites on their own.</li>
+<li><strong>Reset to defaults…</strong> clears your additions after you type <strong>RESET</strong>.</li>
 <li>The defaults include GitHub's API and PyPI.</li>
 </ul>
 <h3>7. Backups</h3>
 <p>Do this often. In <strong>📁 Files ▸ Backup</strong>, tap <strong>⬇️ Export</strong> to save one JSON file with every script, all your tool data and saved versions. Your passcode isn't included.</p>
 <ul>
 <li>Save it to iCloud or Files.</li>
-<li><strong>⬆️ Import</strong> restores a backup.</li>
+<li><strong>⬆️ Import</strong> restores a backup. It asks first, and scripts with the same name get replaced.</li>
+<li>The backup covers your scripts, the Tools tab data, saved versions <strong>and the files in ~</strong> (projects, SQLite databases, the task board's <code>.tasks.json</code>, the job tracker's <code>job_apps.json</code>, GitHub imports). It skips files over 2 MB and anything past 6 MB of files in total, and tells you which ones when you export. Your passcode and any GitHub token are never in it.</li>
 <li><strong>↶ Undo</strong> brings back the last change made by Python, or a script you deleted.</li>
 <li><strong>Reset all data…</strong> wipes everything. Export a backup first!</li>
 </ul>
 <p>Your scripts are stored as plain text on the phone, so <strong>don't paste passwords or tokens into scripts.</strong></p>
 <h3>8. Troubleshooting</h3>
 <ul>
-<li><strong>The button stays on "Loading Python…":</strong> connect to the internet once so Python can download, then reopen the app.</li>
+<li><strong>The button stays on "Loading Python…":</strong> connect to the internet once so Python can download, then reopen the app. With Lite start on, Python only starts when you tap ▶ Run.</li>
+<li><strong>"↻ Some background code from that run would not stop, so Python was restarted":</strong> a script left something running that ignored Stop. Console variables were cleared; just run again.</li>
 <li><strong>A script hangs:</strong> tap <strong>⏹ Stop</strong>. If Python is busy, the Dev buttons tell you to tap Stop.</li>
 <li><strong>"⟳ KPython update ready. Tap to reload (your scripts are saved)." bar:</strong> tap it to reload. Your editor is saved first. You can also search the palette for <strong>Check for KPython update</strong>.</li>
 <li><strong>A fetch fails or gets blocked:</strong> add the site in <strong>🌐 Allowed sites</strong>.</li>
@@ -77,10 +89,11 @@
 </ul>
 <h3>9. Finding things fast</h3>
 <ul>
+<li>Tap <strong>📖</strong> at the top to open this guide. The <strong>Jump to…</strong> menu next to <strong>✕ Close guide</strong> goes straight to a section; both stay at the top while you scroll. Esc also closes it. Dev ▸ <strong>❓ Help guide</strong> lets you search every tool by keyword.</li>
 <li>Tap <strong>🔎</strong> (or Ctrl/⌘+K on a keyboard) to open the command palette: <em>Search every tool and button… (lint, sites, merge)</em>. ↑↓ move, Enter opens, Esc closes. It understands words like "run all", "delete", "update".</li>
 <li><strong>🧭 Getting-started tour</strong> (Dev tab) walks through the basics. It's offered once on first launch.</li>
 <li><strong>🧪 Self-test all tools</strong> (Dev tab) checks every tool and remembers the last results.</li>
 <li><strong>📘 Examples</strong> (Dev tab) has 10 small runnable examples.</li>
-<li><strong>Cancel</strong> on any question in a Dev tool goes back one step; Cancel twice in a row leaves the tool.</li>
+<li><strong>Cancel</strong> (✕) on a question in a Dev tool goes back: to the previous menu in tools that have one, otherwise to the tool's start (it says <em>↩ Back to the start of the tool</em>). Cancel twice in a row closes the tool.</li>
 <li>The <strong>🌓</strong> menu at the top switches System, Light or Dark.</li>
 </ul>

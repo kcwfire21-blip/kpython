@@ -2,8 +2,8 @@
 (function(){
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const GROUPS=[
- ['check','✅ Check & test',['selftestall','lint','tests','cover','testgen','types','metrics','secrets','audit']],
- ['edit','✏️ Edit & refactor',['format','rename','refactor','docgen','search','savedrepl','merge','patch']],
+ ['check','✅ Check & test',['selftestall','lint','quicklint','tests','cover','testgen','types','metrics','secrets','audit']],
+ ['edit','✏️ Edit & refactor',['format','rename','refactor','docgen','snippets','search','findrep','savedrepl','merge','patch']],
  ['run','⏱ Run & measure',['cells','profile','bench','compare','bigo','memory','debug']],
  ['learn','📖 Understand & learn',['tour','examples','outline','explain','imports','markdown','help','cheats','katas']],
  ['data','🗄 Data, web & time',['sql','http','apis','data','json','chart','logs','time','regex','codec','convert','templates']],
@@ -19,7 +19,7 @@ function groupDev(){const dev=document.getElementById('v-dev');if(!dev||dev.data
  dev.insertBefore(holder,dev.firstElementChild);
  $$('.card',dev).forEach(c=>{if(c.closest('#dev-groups'))return;$$('.g2',c).forEach(g=>{if(!g.children.length)g.remove()});
   if(c.querySelector('button,select,input,iframe,textarea,[id]'))return;const h=c.querySelector('.hint');if(h&&/By the team/.test(h.textContent)){const t=c.querySelector('h3');if(t)t.textContent='Credits'}else if(!c.textContent.replace(c.querySelector('h3')?.textContent||'','').trim())c.remove()})}
-const ALIAS={cells:'cell notebook jupyter run all add delete reorder move',merge:'conflict three way 3-way',bench:'benchmark speed timeit compare',selftestall:'self test all check everything',tour:'start welcome intro getting started tutorial',examples:'example samples demo learn',ghimport:'github import clone download repo',help:'guide docs manual how',
+const ALIAS={quicklint:'lint unused imports variables mutable default bare except',findrep:'find replace files folder regex rename across project',snippets:'snippet library insert template clipboard reuse',cells:'cell notebook jupyter run all add delete reorder move',merge:'conflict three way 3-way',bench:'benchmark speed timeit compare',selftestall:'self test all check everything',tour:'start welcome intro getting started tutorial',examples:'example samples demo learn',ghimport:'github import clone download repo',help:'guide docs manual how',
  'bk-undo':'undo restore deleted trash recover','bk-reset':'wipe erase reset','pal-btn':'search',lint:'check errors style',format:'pretty indent black',packages:'pip install micropip',sites:'allowed network domains whitelist'};
 function aliasOf(el){return ALIAS[el.dataset.dev]||ALIAS[el.id]||(/Update|Offline/i.test(el.textContent)?'update reload refresh version':'')}
 function items(){const out=[];const seen=new Set();

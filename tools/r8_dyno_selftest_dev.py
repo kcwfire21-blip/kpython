@@ -6,7 +6,7 @@ HOME = "/home/pyodide"
 DIRS = ["/kptools", "/workspace/pyapp/tools"]   # KPython: the app's read-only tool folder
 RESULTS = HOME + "/.kp_selftest_last.json"
 TIMEOUT = 10.0
-NAMES = ("self_test", "selftest", "_self_test", "run_self_tests", "self_tests")
+NAMES = ("self_test", "selftest", "_self_test", "run_self_tests", "self_tests", "run_selftests")
 
 class NeedsInput(Exception): pass
 class TimedOut(Exception): pass

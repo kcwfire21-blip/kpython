@@ -356,6 +356,15 @@ def run_selftests():
     print("All %d self-tests passed." % ok)
     return True
 
+# --- KPython v11: bot2help's full self-test (temp dir under ~; see r9_bot2help_selftests) ---
+def self_test():
+    import r9_bot2help_selftests as _st
+    return _st.self_test_logs(sys.modules.get(__name__) or _kp_ns())
+
+def _kp_ns():
+    import types
+    return types.SimpleNamespace(**globals())
+
 # --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
 try:
     from kp_common import harden as _kp_harden

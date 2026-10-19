@@ -329,6 +329,8 @@ def main(base_dir=None, force_text=False):
                 print("Loaded %d rows, columns: %s" % (len(rows), ", ".join(cols)))
             elif c == "2":
                 p = _ask("Path under %s: " % (base_dir or BASE_DIR)) or ""
+                if not p.strip():
+                    print("↩ Back to the menu."); continue
                 cols, rows = load_file(p, base_dir)
                 print("Loaded %d rows, columns: %s" % (len(rows), ", ".join(cols)))
             elif c == "3":
@@ -364,12 +366,12 @@ def main(base_dir=None, force_text=False):
                     fig = mpl_figure(kind, rows, x, y, bins)
                     if _yes("Save PNG? (y/N) "):
                         p = _ask("PNG path under %s: " % (base_dir or BASE_DIR)) or ""
-                        r = save_png(fig, p, base_dir, _yes)
+                        r = save_png(fig, p, base_dir, _yes) if p.strip() else None
                         print("Saved %s" % r if r else "Not saved.")
                     plt.close(fig)
                 elif _yes("Save text chart as .txt? (y/N) "):
                     p = _ask("TXT path under %s: " % (base_dir or BASE_DIR)) or ""
-                    r = save_txt(text, p, base_dir, _yes)
+                    r = save_txt(text, p, base_dir, _yes) if p.strip() else None
                     print("Saved %s" % r if r else "Not saved.")
             else:
                 print("Unknown option.")
@@ -472,6 +474,15 @@ def run_selftests(verbose=True):
               (passed, failed, "available" if HAVE_MPL else "not available"))
     return failed == 0
 
+
+# --- KPython v11: bot2help's full self-test (temp dir under ~; see r9_bot2help_selftests) ---
+def self_test():
+    import r9_bot2help_selftests as _st
+    return _st.self_test_chart(sys.modules.get(__name__) or _kp_ns())
+
+def _kp_ns():
+    import types
+    return types.SimpleNamespace(**globals())
 
 # --- KPython v9: shared hardening (size caps + path checks before use) lives in kp_common.py ---
 try:

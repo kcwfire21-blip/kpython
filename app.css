@@ -14,6 +14,8 @@ button:active,button.tap{transform:scale(.93);filter:brightness(1.35)}
 #lock .logo{font-size:64px}#lock input{width:220px;text-align:center;font-size:24px}
 #top{display:flex;align-items:center;gap:8px;padding:8px 0}#top h1{font-size:19px;margin:0 auto 0 0}
 .pill{font-size:12px;padding:4px 8px;border-radius:99px;background:#21262d;color:var(--mut)}.pill.ok{color:var(--ok)}
+.pill.spin::before{content:"";display:inline-block;width:.8em;height:.8em;margin-right:.4em;vertical-align:-.1em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:kpspin .8s linear infinite}@keyframes kpspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.pill.spin::before{animation:none;border-right-color:currentColor;opacity:.5}}
 .view{display:none}.view.on{display:block}
 .row{display:flex;gap:6px;align-items:center;margin:6px 0}.row select,.row input{flex:1;width:auto;min-width:0}
 #edwrap{border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -133,5 +135,10 @@ input,select,textarea{border-color:var(--field)}
 #diffsheet{position:fixed;inset:0;z-index:300;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;border:3px solid var(--acc)}#diffsheet pre{flex:1;overflow:auto;background:var(--sunk);padding:8px;font-size:13px;white-space:pre-wrap;word-break:break-all;margin:0}
 #guide{position:fixed;inset:0;z-index:250;background:var(--bg);overflow:auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}#guide code{color:var(--acc2)}
 /* v10: keep the header inside a 375-390px iPhone width now that it has theme + guide buttons */
-#top{gap:6px;flex-wrap:wrap;row-gap:6px}#top>*{flex-shrink:0}#top h1{white-space:nowrap}#pystat,#offstat{font-size:12px}
-@media (max-width:430px){#top button,#top select{min-width:40px;padding-left:6px;padding-right:6px}#theme-sel{max-width:52px}#top h1{font-size:17px}}
+/* v11: header = title with the two status pills under it (left) + one row of buttons (right); fits 375-390px on one band */
+#top{gap:8px;flex-wrap:nowrap}#top-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}#top h1{white-space:nowrap;margin:0;font-size:19px}
+#top-pills{display:flex;gap:4px;min-width:0}#top-pills .pill{font-size:11px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}#pystat{flex:0 1 auto}#offstat{flex:0 1 auto}
+#top-b{display:flex;gap:6px;align-items:center;flex-shrink:0}
+@media (max-width:430px){#top-b button,#top-b select{min-width:40px;padding-left:6px;padding-right:6px}#theme-sel{max-width:50px}#top h1{font-size:17px}}
+#guide{padding-top:0}#guide-bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 10px;border-bottom:1px solid var(--line)}#guide-bar select{flex:1;min-width:0}
+#pyprog{display:block;width:120px;margin:2px 0 0}#lockprog{margin-top:18px;text-align:center}#lockprog progress{width:220px;height:10px;accent-color:var(--acc)}

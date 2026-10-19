@@ -80,7 +80,10 @@ for w, n in Counter(words).most_common(3):
     print(f"{w}: {n}")
 '''),
  "date_math": ("Date math: days between dates, add days, next weekday", '''from datetime import date, timedelta
-start, end = date(2026, 10, 16), date(2026, 12, 25)
+start = date.today()
+end = date(start.year, 12, 25)
+if end < start: end = date(start.year + 1, 12, 25)
+print("Today:", start)
 print("Days until Dec 25:", (end - start).days)
 print("In 30 days:", start + timedelta(days=30))
 monday = start + timedelta(days=(7 - start.weekday()) % 7 or 7)
@@ -108,6 +111,10 @@ print("sum() is faster" if builtin < loop else "loop is faster")
 }
 
 def safe_base(base=None):
+    import builtins as _b
+    g = getattr(_b, "kp_safe_path", None)
+    if g is not None and base and os.path.realpath(base).startswith("/home/pyodide"):
+        g(os.path.relpath(os.path.realpath(base), "/home/pyodide"))   # v11 (Drop #9): confine an explicit base to ~
     b = os.path.realpath(base or BASE)
     os.makedirs(b, exist_ok=True)
     return b

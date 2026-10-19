@@ -2,9 +2,34 @@
 import sys, os, json, re, code, importlib, pydoc, io
 HOME = '/home/pyodide'
 os.chdir(HOME)
-if HOME not in sys.path: sys.path.insert(0, HOME)
-KPTOOLS = '/kptools'  # v9.1: read-only, in-memory, hash-checked copies (no longer under the persistent ~)
-if KPTOOLS not in sys.path: sys.path.append(KPTOOLS)
+KPTOOLS = '/kptools'  # v9.1: in-memory, hash-checked copies (re-written from the verified texts before every run)
+# v11 (Drop #1): the stdlib and installed packages come BEFORE ~, so a file saved in ~ (json.py, json/, random.py…)
+# can't shadow them; tool names are served only from /kptools by the finder below.
+sys.path[:] = [p for p in sys.path if p not in ('', HOME, KPTOOLS)] + [HOME, KPTOOLS]
+_KP_TOOL_NAMES = set()
+class _KPToolFinder:
+    """v11 (Drop #1): KPython tool modules (and any kp_* name) load ONLY from the verified /kptools copies."""
+    @classmethod
+    def find_spec(cls, fullname, path=None, target=None):
+        top = fullname.split('.')[0]
+        if top in _KP_TOOL_NAMES or (top.startswith('kp_') and not top.startswith('kp_st_')):
+            if '.' in fullname: raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
+            f = os.path.join(KPTOOLS, top + '.py')
+            if top in _KP_TOOL_NAMES and os.path.isfile(f):
+                import importlib.util as _iu
+                return _iu.spec_from_file_location(fullname, f)
+            raise ModuleNotFoundError(f"No module named {fullname!r} (KPython tool names load only from the verified tools)", name=fullname)
+        return None
+    @classmethod
+    def invalidate_caches(cls): pass
+sys.meta_path.insert(0, _KPToolFinder)
+def _kp_set_tools(names_json):
+    _KP_TOOL_NAMES.clear(); _KP_TOOL_NAMES.update(n[:-3] for n in json.loads(names_json) if n.endswith('.py'))
+builtins_ = __import__('builtins'); builtins_.kp_tool_names = lambda: sorted(_KP_TOOL_NAMES)
+def _kp_reserved(m):
+    """v11 (Drop #2): names a saved script may not take in ~ (stdlib, packages, KPython tools, kp_*)."""
+    return (m in getattr(sys, 'stdlib_module_names', ()) or m in _KP_TOOL_NAMES or m.startswith(('kp_', '_kp'))
+            or bool(re.match(r'r\d+_', m)) or m in ('pyodide', 'micropip', 'js', 'pyodide_js', 'numpy', 'pandas', 'matplotlib'))
 try:
     import shutil as _sh0; _sh0.rmtree(HOME + '/kptools', ignore_errors=True)  # drop the old, Python-writable copy
 except Exception: pass
@@ -17,17 +42,32 @@ def _kp_write_modules(files_json):
     files = json.loads(files_json)
     for m in list(_kp_user_mods):
         sys.modules.pop(m, None)
+    _kp_user_mods.clear()
     for name, src in files.items():
         m = _kp_modname(name)
-        with open(os.path.join(HOME, m + '.py'), 'w') as f: f.write(src)
+        if _kp_reserved(m): continue   # v11: never write ~/json.py, ~/kp_common.py, ~/r6_drop_merge.py …
+        p = os.path.join(HOME, m + '.py')
+        if os.path.islink(p): continue
+        with open(p, 'w') as f: f.write(src)
         _kp_user_mods.add(m)
     importlib.invalidate_caches()
+builtins_.kp_saved_mirrors = lambda: [os.path.join(HOME, m + '.py') for m in sorted(_kp_user_mods)]
 _kp_repl_ns = {'__name__': '__console__', '__builtins__': __builtins__}
 _kp_console = code.InteractiveConsole(_kp_repl_ns, filename='<console>')
-def _kp_repl_push(line):
+_kp_repl_before = set()
+def _kp_repl_push(line, job=0):
+    global _kp_repl_before
     try: _kp_reassert()   # v10: the REPL path re-asserts the shared path check too
     except NameError: pass
-    return bool(_kp_console.push(line))
+    import asyncio
+    try: _kp_repl_before = set(asyncio.all_tasks())
+    except RuntimeError: _kp_repl_before = set()
+    tok = _KP_JOB.set(int(job))   # v11 (Get back M1): bridge calls made by this line carry its job token
+    try: return bool(_kp_console.push(line))
+    finally: _KP_JOB.reset(tok)
+async def _kp_repl_after():
+    """v11 (Get back M1): tasks a console line started are cancelled too. Returns how many refused to stop."""
+    return await _kp_cancel_left(_kp_repl_before)
 def _kp_repl_reset():
     global _kp_console
     _kp_repl_ns.clear(); _kp_repl_ns.update({'__name__': '__console__', '__builtins__': __builtins__})
@@ -259,27 +299,76 @@ except Exception:
 # "Uncaught (in promise)" error in the console. Converting it here keeps the same message for the app.
 class KPStopped(Exception):
     pass
+import contextvars as _cv
+_KP_JOB = _cv.ContextVar('kp_job', default=0)
+def _kp_job_tok():
+    """v11 (Get back M1): the job id of the run/console line whose code is executing right now (0 = none, e.g. a JS timer)."""
+    return _KP_JOB.get()
+async def _kp_cancel_left(before):
+    import asyncio
+    cur = asyncio.current_task()
+    left = [t for t in asyncio.all_tasks() if t not in before and t is not cur and not t.done()]
+    for t in left: t.cancel()
+    for _ in range(3):
+        if not any(not t.done() for t in left): break
+        await asyncio.sleep(0)
+    stuck = sum(1 for t in left if not t.done())
+    if left: print(f"(stopped {len(left) - stuck} background task(s) this run left running)")
+    return stuck
+_KP_SYS_PATH0 = list(sys.path)
+_KP_META0 = list(sys.meta_path)
+def _kp_restore_import_state():
+    """v11 (Drop #6): sys.path / sys.meta_path changes made by a run don't carry into later runs and tools."""
+    sys.path[:] = _KP_SYS_PATH0 + [p for p in sys.path if p not in _KP_SYS_PATH0 and p.startswith('/lib/')]
+    keep = [f for f in sys.meta_path if f not in _KP_META0 and type(f).__module__.split('.')[0] in ('pyodide', '_pyodide', 'micropip', 'importlib', '_frozen_importlib', '_frozen_importlib_external', 'setuptools', '_distutils_hack')]
+    sys.meta_path[:] = [_KPToolFinder] + [f for f in _KP_META0 if f is not _KPToolFinder] + keep
+def _kp_purge_tools():
+    """v11 (Drop #4): tool modules are re-imported from the freshly re-written /kptools for every run."""
+    for n in list(sys.modules):
+        top = n.split('.')[0]
+        if top in _KP_TOOL_NAMES or top.startswith('kp_st_'): sys.modules.pop(n, None)
 def _kp_make_runner(_sp=safe_path, _inp=_kp_input3):
     # v10 (Get back L1): the private copies live in this closure, not in a __main__ global a script could reassign.
     # Note: kp_safe_path is a guard against mistakes, not a sandbox; code in the same interpreter can always get around it.
-    import asyncio
-    async def _kp_run_code(code, ns, filename):
-        from pyodide.code import eval_code_async
+    import asyncio, posixpath, genericpath, shutil
+    _code0, _real0, _islink0, _norm0 = _sp.__code__, posixpath.realpath, posixpath.islink, posixpath.normpath
+    def reassert():
+        # v11 (Drop #5): put back the path check AND the os.path functions it relies on if a script swapped them
+        bad = []
+        if _sp.__code__ is not _code0: _sp.__code__ = _code0; bad.append('kp_safe_path code')
+        for mod in (posixpath, os.path):
+            if mod.realpath is not _real0: mod.realpath = _real0; bad.append('os.path.realpath')
+            if mod.islink is not _islink0: mod.islink = _islink0; bad.append('os.path.islink')
+            if mod.normpath is not _norm0: mod.normpath = _norm0; bad.append('os.path.normpath')
         builtins.kp_safe_path = _sp
+        if bad: print("⚠️ KPython restored " + ", ".join(sorted(set(bad))) + " (changed by an earlier run).")
+    async def _kp_run_code(code, ns, filename, job=0):
+        from pyodide.code import eval_code_async
+        global _kp_left
+        reassert(); _kp_purge_tools(); _kp_restore_import_state()
         builtins.input = _inp
+        _kp_nav_input.n = 0          # v11 (Get back L6): every run starts with a fresh Cancel counter
         before = set(asyncio.all_tasks())
+        tok = _KP_JOB.set(int(job))
         try:
             return await eval_code_async(code, globals=ns, filename=filename)
         except KeyboardInterrupt as e:
             raise KPStopped("KeyboardInterrupt: " + str(e)) from None
         finally:
-            # v10 (Get back M2): background tasks a run left behind are cancelled, so they can't act inside a later run
-            left = [t for t in asyncio.all_tasks() if t not in before and t is not asyncio.current_task() and not t.done()]
-            for t in left: t.cancel()
-            if left: print(f"(stopped {len(left)} background task(s) this run left running)")
-    def reassert():
-        builtins.kp_safe_path = _sp
+            # v10/v11 (Get back M1/M2): background tasks a run left behind are cancelled; any that refuse make the app restart Python
+            _KP_JOB.reset(tok)
+            _kp_left = await _kp_cancel_left(before)
+            _kp_restore_import_state()
+            try:   # v11 (Drop #8): temp files don't pile up in the persistent ~/.kp_tmp
+                for e in os.scandir(_TMP):
+                    (shutil.rmtree(e.path, ignore_errors=True) if e.is_dir(follow_symlinks=False) else os.remove(e.path))
+            except Exception: pass
     return _kp_run_code, reassert
+_kp_left = 0
+def _kp_take_left():
+    global _kp_left
+    n, _kp_left = _kp_left, 0
+    return n
 _kp_run_code, _kp_reassert = _kp_make_runner()
 del _KP_SAFE_PATH
 
@@ -288,15 +377,19 @@ try:
     _p = os.path.join(HOME, 'link.log')
     if os.path.islink(_p): os.remove(_p)
     import glob as _g, shutil as _sh
-    for _d in _g.glob(os.path.join(HOME, 'tmp*')):
-        if os.path.isdir(_d) and not os.path.islink(_d) and os.path.exists(os.path.join(_d, 'a.log')): _sh.rmtree(_d, ignore_errors=True)
+    for _d in _g.glob(os.path.join(HOME, 'tmp*')):   # v11 (Drop #7): only tempfile-style names holding the old self-test's files
+        if (re.fullmatch(r'tmp[a-z0-9_]{8}', os.path.basename(_d)) and os.path.isdir(_d) and not os.path.islink(_d)
+                and os.path.exists(os.path.join(_d, 'a.log')) and set(os.listdir(_d)) <= {'a.log', 'b.log', 'link.log', 'sub'}):
+            _sh.rmtree(_d, ignore_errors=True)
 except Exception:
     pass
 
 # v10: Cancel = back one level in Dev tools. A cancelled input() raises KPBack, which is BOTH an Exception and a
 # KeyboardInterrupt, so the nearest handler in the tool (its menu loop's `except Exception`, or a local Cancel handler)
 # takes it and the tool goes back one level. Two Cancels in a row with no answer in between end the tool.
-class KPBack(Exception, KeyboardInterrupt):
+class KPBack(KeyboardInterrupt):
+    # v11 (Get back L6): a BaseException now, so a tool's `except Exception:` can't swallow it (no more "Error: ↩ cancelled").
+    # The Dev-tab wrapper catches it and goes back to the tool's start menu; a second Cancel in a row ends the tool.
     def __str__(self): return "↩ cancelled, back to the menu"
 builtins.KPBack = KPBack
 def _kp_nav_input(prompt=""):
@@ -325,3 +418,74 @@ async def kp_request_site(origin, why=""):
     Returns True if added; it applies after Python restarts (the app does that when the run ends)."""
     return bool(await js.kpSiteAsk(str(origin)[:200], str(why)[:120]))
 builtins.kp_request_site = kp_request_site
+
+def kp_editor_insert(text):
+    """v11: ASK the app to insert text at the editor cursor. The app shows the text and Keivon confirms.
+    Only works while a run is in progress; capped at 20,000 characters and 5 requests per run. Returns True if inserted."""
+    text = str(text)
+    if len(text) > 20000: raise ValueError("kp_editor_insert: text is over 20,000 characters")
+    return bool(js.kpEditorInsert(text))
+builtins.kp_editor_insert = kp_editor_insert
+
+# ---- v11: files in ~ (Files tab list + backups) ----
+_KP_HOME_SKIP_DIRS = {'.history', '.kp_tmp', '.kp_imap', '__pycache__', '.cache', '.local', '.config'}
+_KP_TEXT_EXT = ('.py', '.txt', '.md', '.json', '.csv', '.tsv', '.toml', '.ini', '.cfg', '.yaml', '.yml', '.html', '.css', '.js', '.sql', '.log', '.xml', '.rst')
+def _kp_home_walk():
+    mir = set(builtins.kp_saved_mirrors())
+    for r, ds, fs in os.walk(HOME):
+        ds[:] = sorted(d for d in ds if d not in _KP_HOME_SKIP_DIRS and not os.path.islink(os.path.join(r, d)))
+        for f in sorted(fs):
+            p = os.path.join(r, f)
+            if os.path.islink(p) or p in mir or not os.path.isfile(p): continue
+            yield p, os.path.relpath(p, HOME)
+def _kp_home_list():
+    out = []
+    for p, rel in _kp_home_walk():
+        out.append({'p': rel, 'n': os.path.getsize(p), 't': rel.lower().endswith(_KP_TEXT_EXT)})
+        if len(out) >= 2000: break
+    return json.dumps(out)
+def _kp_home_read(rel):
+    p = safe_path(str(rel))
+    if os.path.islink(p) or not os.path.isfile(p): return json.dumps({'err': 'not a file'})
+    if os.path.getsize(p) > 2_000_000: return json.dumps({'err': 'over 2 MB'})
+    import base64
+    data = open(p, 'rb').read()
+    try: return json.dumps({'t': data.decode('utf-8')})
+    except UnicodeDecodeError: return json.dumps({'b': base64.b64encode(data).decode()})
+def _kp_home_dump(limit=6_000_000):
+    """Backup of the files Python tools keep in ~ (projects, SQLite databases, .tasks.json, job_apps.json …).
+    Skips: saved-script copies (already in the backup), .history (backed up separately), temp/cache folders, files over 2 MB,
+    and anything past 6 MB in total. Returns {"files": {...}, "skipped": [...]}."""
+    import base64
+    files, skipped, total = {}, [], 0
+    for p, rel in _kp_home_walk():
+        n = os.path.getsize(p)
+        if n > 2_000_000 or total + n > limit: skipped.append(f"{rel} ({n // 1000} KB)"); continue
+        data = open(p, 'rb').read(); total += n
+        try: files[rel] = {'t': data.decode('utf-8')}
+        except UnicodeDecodeError: files[rel] = {'b': base64.b64encode(data).decode()}
+    return json.dumps({'files': files, 'skipped': skipped})
+def _kp_home_load(data_json):
+    import base64
+    d = json.loads(data_json); n = 0; bad = []
+    if not isinstance(d, dict): return json.dumps({'n': 0, 'bad': ['not a dict']})
+    for rel, v in list(d.items())[:5000]:
+        try:
+            if not isinstance(rel, str) or not isinstance(v, dict): raise ValueError('bad entry')
+            parts = rel.split('/')
+            if any(x in ('', '.', '..') for x in parts) or parts[0] in _KP_HOME_SKIP_DIRS: raise ValueError('refused path')
+            if len(parts) == 1 and rel.endswith('.py') and _kp_reserved(rel[:-3]): raise ValueError('reserved name')
+            if len(parts) > 1 and _kp_reserved(parts[0].lower()): raise ValueError('reserved folder name')
+            data = v['t'].encode('utf-8') if isinstance(v.get('t'), str) else base64.b64decode(v.get('b', ''), validate=True)
+            if len(data) > 2_000_000: raise ValueError('too big')
+            full = safe_path(rel)
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            if os.path.islink(full): raise ValueError('symlink')
+            tmp = full + '.kpbak'
+            if os.path.lexists(tmp): os.remove(tmp)
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            with os.fdopen(fd, 'wb') as f: f.write(data)
+            os.replace(tmp, full); n += 1
+        except Exception as e:
+            bad.append(f"{str(rel)[:60]}: {e}")
+    return json.dumps({'n': n, 'bad': bad[:20]})
